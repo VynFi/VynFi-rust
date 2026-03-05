@@ -2,7 +2,7 @@
 name = "vynfi"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.82"
+rust-version = "1.83"
 license = "Apache-2.0"
 authors = ["VynFi <hello@vynfi.com>"]
 description = "Rust SDK for the VynFi synthetic financial data API"
