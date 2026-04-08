@@ -1,11 +1,11 @@
 use std::time::Duration;
 
-use reqwest::{Response, StatusCode};
+use reqwest::{RequestBuilder, Response, StatusCode};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::error::{ErrorBody, VynFiError};
-use crate::resources::{ApiKeys, Catalog, Credits, Jobs, Usage};
+use crate::resources::{ApiKeys, Billing, Catalog, Jobs, Quality, Usage, Webhooks};
 
 const DEFAULT_BASE_URL: &str = "https://api.vynfi.com";
 const DEFAULT_TIMEOUT_SECS: u64 = 30;
@@ -35,14 +35,14 @@ impl Client {
     }
 
     // -- Resource accessors ---------------------------------------------------
-    // Each returns a lightweight handle that borrows `&self`.
 
-    /// Jobs resource — submit, list, get, and download generation jobs.
+    /// Jobs resource — submit, list, get, cancel, stream, and download
+    /// generation jobs.
     pub fn jobs(&self) -> Jobs<'_> {
         Jobs::new(self)
     }
 
-    /// Catalog resource — list sectors and tables.
+    /// Catalog resource — list sectors, tables, and fingerprints.
     pub fn catalog(&self) -> Catalog<'_> {
         Catalog::new(self)
     }
@@ -57,9 +57,19 @@ impl Client {
         ApiKeys::new(self)
     }
 
-    /// Credits resource — purchase packs and view prepaid balance.
-    pub fn credits(&self) -> Credits<'_> {
-        Credits::new(self)
+    /// Quality metrics resource.
+    pub fn quality(&self) -> Quality<'_> {
+        Quality::new(self)
+    }
+
+    /// Webhooks resource — CRUD and delivery history.
+    pub fn webhooks(&self) -> Webhooks<'_> {
+        Webhooks::new(self)
+    }
+
+    /// Billing resource — subscription, invoices, payment methods.
+    pub fn billing(&self) -> Billing<'_> {
+        Billing::new(self)
     }
 
     // -- Internal request helpers (used by resource structs) ------------------
@@ -70,7 +80,7 @@ impl Client {
         method: reqwest::Method,
         path: &str,
     ) -> Result<T, VynFiError> {
-        self.request_with_body::<T, ()>(method, path, None).await
+        self.send_with_retry(method, path, |req| req).await
     }
 
     /// Make a JSON request with an optional body and retry logic.
@@ -84,14 +94,75 @@ impl Client {
         T: DeserializeOwned,
         B: serde::Serialize,
     {
+        let body_value = body.map(|b| serde_json::to_value(b).expect("serializable body"));
+        self.send_with_retry(method, path, move |req| match &body_value {
+            Some(v) => req.json(v),
+            None => req,
+        })
+        .await
+    }
+
+    /// Make a JSON request with query parameters and retry logic.
+    pub(crate) async fn request_with_params<T: DeserializeOwned>(
+        &self,
+        method: reqwest::Method,
+        path: &str,
+        params: &[(&str, String)],
+    ) -> Result<T, VynFiError> {
+        let params = params.to_vec();
+        self.send_with_retry(method, path, move |req| req.query(&params))
+            .await
+    }
+
+    /// Raw response (for binary downloads), with optional query parameters.
+    pub(crate) async fn request_raw(
+        &self,
+        method: reqwest::Method,
+        path: &str,
+        params: &[(&str, String)],
+    ) -> Result<Response, VynFiError> {
+        let url = format!("{}{}", self.base_url, path);
+        let mut req = self.http.request(method, &url);
+        if !params.is_empty() {
+            req = req.query(params);
+        }
+        let resp = req.send().await?;
+        if resp.status().is_client_error() || resp.status().is_server_error() {
+            return Err(Self::error_from_response(resp).await);
+        }
+        Ok(resp)
+    }
+
+    /// Build an absolute URL for the given path (used by resources to open SSE
+    /// streams via `reqwest-eventsource`).
+    pub(crate) fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+
+    /// Borrow the inner `reqwest::Client` (used by resources that need to
+    /// construct custom requests, e.g. SSE streaming).
+    pub(crate) fn http(&self) -> &reqwest::Client {
+        &self.http
+    }
+
+    // -- Private helpers ------------------------------------------------------
+
+    /// Shared retry loop for all JSON-deserialized requests.
+    async fn send_with_retry<T, F>(
+        &self,
+        method: reqwest::Method,
+        path: &str,
+        configure: F,
+    ) -> Result<T, VynFiError>
+    where
+        T: DeserializeOwned,
+        F: Fn(RequestBuilder) -> RequestBuilder,
+    {
         let url = format!("{}{}", self.base_url, path);
         let mut last_err: Option<VynFiError> = None;
 
         for attempt in 0..=self.max_retries {
-            let mut req = self.http.request(method.clone(), &url);
-            if let Some(b) = body {
-                req = req.json(b);
-            }
+            let req = configure(self.http.request(method.clone(), &url));
 
             let resp = match req.send().await {
                 Ok(r) => r,
@@ -107,7 +178,6 @@ impl Client {
 
             let status = resp.status();
 
-            // Retry on 429 (rate-limited) and 5xx (server errors).
             if Self::should_retry(status) && attempt < self.max_retries {
                 let retry_after = resp
                     .headers()
@@ -117,14 +187,11 @@ impl Client {
                     .map(Duration::from_secs);
 
                 let wait = retry_after.unwrap_or_else(|| Self::backoff(attempt));
-                // Consume the body so the connection can be reused.
                 let _ = resp.bytes().await;
                 tokio::time::sleep(wait).await;
                 continue;
             }
 
-            // 204 No Content — synthesize a null value so `()` and other
-            // `Deserialize`-from-null types work seamlessly.
             if status == StatusCode::NO_CONTENT {
                 return serde_json::from_value(serde_json::Value::Null).map_err(VynFiError::from);
             }
@@ -139,56 +206,6 @@ impl Client {
 
         Err(last_err.unwrap_or_else(|| VynFiError::Config("max retries exceeded".into())))
     }
-
-    /// Make a JSON request with query parameters and retry logic.
-    pub(crate) async fn request_with_params<T: DeserializeOwned>(
-        &self,
-        method: reqwest::Method,
-        path: &str,
-        params: &[(&str, String)],
-    ) -> Result<T, VynFiError> {
-        let url = format!("{}{}", self.base_url, path);
-        let mut last_err: Option<VynFiError> = None;
-
-        for attempt in 0..=self.max_retries {
-            let resp = match self
-                .http
-                .request(method.clone(), &url)
-                .query(params)
-                .send()
-                .await
-            {
-                Ok(r) => r,
-                Err(e) => {
-                    last_err = Some(VynFiError::Http(e));
-                    if attempt < self.max_retries {
-                        tokio::time::sleep(Self::backoff(attempt)).await;
-                        continue;
-                    }
-                    return Err(last_err.unwrap());
-                }
-            };
-
-            let status = resp.status();
-
-            if Self::should_retry(status) && attempt < self.max_retries {
-                let _ = resp.bytes().await;
-                tokio::time::sleep(Self::backoff(attempt)).await;
-                continue;
-            }
-
-            if status.is_client_error() || status.is_server_error() {
-                return Err(Self::error_from_response(resp).await);
-            }
-
-            let bytes = resp.bytes().await?;
-            return serde_json::from_slice(&bytes).map_err(VynFiError::from);
-        }
-
-        Err(last_err.unwrap_or_else(|| VynFiError::Config("max retries exceeded".into())))
-    }
-
-    // -- Private helpers ------------------------------------------------------
 
     fn should_retry(status: StatusCode) -> bool {
         status == StatusCode::TOO_MANY_REQUESTS || status.is_server_error()
@@ -206,10 +223,9 @@ impl Client {
         let body: ErrorBody = resp.json().await.unwrap_or_else(|_| ErrorBody {
             error_type: String::new(),
             title: String::new(),
-            detail: String::new(),
+            detail: format!("HTTP {}", status.as_u16()),
             status: status.as_u16(),
-            request_id: String::new(),
-            fields: vec![],
+            instance: None,
         });
 
         let body = Box::new(body);
@@ -317,14 +333,13 @@ pub(crate) fn extract_list<T: DeserializeOwned>(value: Value) -> Result<Vec<T>, 
     if value.is_array() {
         return Ok(serde_json::from_value(value)?);
     }
-    if let Some(obj) = value.as_object() {
-        // Try "data" first, then the first array-valued key.
-        if let Some(arr) = obj.get("data").filter(|v| v.is_array()) {
-            return Ok(serde_json::from_value(arr.clone())?);
+    if let Value::Object(mut map) = value {
+        if let Some(arr) = map.remove("data").filter(|v| v.is_array()) {
+            return Ok(serde_json::from_value(arr)?);
         }
-        for v in obj.values() {
+        for (_, v) in map {
             if v.is_array() {
-                return Ok(serde_json::from_value(v.clone())?);
+                return Ok(serde_json::from_value(v)?);
             }
         }
     }

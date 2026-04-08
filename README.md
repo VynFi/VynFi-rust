@@ -27,7 +27,7 @@ async fn main() -> Result<(), vynfi::VynFiError> {
 
     // Generate synthetic data
     let job = client.jobs().generate(&GenerateRequest::new(
-        vec![TableSpec { name: "transactions".into(), rows: 1000 }],
+        vec![TableSpec { name: "transactions".into(), rows: 1000, base_rate: None }],
         "retail",
     )).await?;
     println!("Job submitted: {}", job.id);
@@ -39,8 +39,8 @@ async fn main() -> Result<(), vynfi::VynFiError> {
     }
 
     // Check usage
-    let usage = client.usage().summary().await?;
-    println!("Balance: {} credits (tier: {})", usage.balance, usage.tier);
+    let usage = client.usage().summary(None).await?;
+    println!("Balance: {} credits", usage.balance);
 
     Ok(())
 }
@@ -62,11 +62,13 @@ fn main() -> Result<(), vynfi::VynFiError> {
 
 | Resource | Methods |
 |----------|---------|
-| `client.jobs()` | `generate`, `generate_quick`, `list`, `get`, `download` |
-| `client.catalog()` | `list_sectors`, `get_sector` |
+| `client.jobs()` | `generate`, `generate_config`, `generate_quick`, `list`, `get`, `cancel`, `stream`, `download`, `download_file` |
+| `client.catalog()` | `list_sectors`, `get_sector`, `list`, `get_fingerprint` |
 | `client.usage()` | `summary`, `daily` |
 | `client.api_keys()` | `create`, `list`, `get`, `update`, `revoke` |
-| `client.credits()` | `purchase`, `balance`, `history` |
+| `client.quality()` | `scores`, `timeline` |
+| `client.webhooks()` | `create`, `list`, `get`, `update`, `delete`, `test` |
+| `client.billing()` | `subscription`, `checkout`, `portal`, `invoices`, `payment_method` |
 
 ## Error Handling
 

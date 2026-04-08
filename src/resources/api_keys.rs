@@ -51,11 +51,9 @@ impl<'a> ApiKeys<'a> {
     }
 
     /// Revoke (delete) an API key. This action is irreversible.
-    pub async fn revoke(&self, key_id: &str) -> Result<(), VynFiError> {
-        let _: serde_json::Value = self
-            .client
+    pub async fn revoke(&self, key_id: &str) -> Result<RevokeKeyResponse, VynFiError> {
+        self.client
             .request(Method::DELETE, &format!("/v1/api-keys/{}", key_id))
-            .await?;
-        Ok(())
+            .await
     }
 }

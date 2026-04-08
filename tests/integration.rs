@@ -25,7 +25,7 @@ fn client() -> Client {
 }
 
 // ===========================================================================
-// Catalog
+// Catalog / Sectors
 // ===========================================================================
 
 #[tokio::test]
@@ -34,7 +34,6 @@ async fn catalog_list_sectors() {
     let c = client();
     let sectors = c.catalog().list_sectors().await.unwrap();
     assert!(!sectors.is_empty(), "expected at least one sector");
-    // Every sector must have a slug and table_count > 0
     for s in &sectors {
         assert!(!s.slug.is_empty());
         assert!(s.table_count > 0, "sector {} has 0 tables", s.slug);
@@ -48,7 +47,6 @@ async fn catalog_get_sector_retail() {
     let sector = c.catalog().get_sector("retail").await.unwrap();
     assert_eq!(sector.slug, "retail");
     assert!(!sector.tables.is_empty(), "retail should have tables");
-    // Check a known table exists
     let names: Vec<&str> = sector.tables.iter().map(|t| t.name.as_str()).collect();
     assert!(
         names.contains(&"journal_entries"),
@@ -71,6 +69,24 @@ async fn catalog_get_sector_not_found() {
     );
 }
 
+#[tokio::test]
+#[ignore]
+async fn catalog_list() {
+    let c = client();
+    let items = c.catalog().list(None, None).await.unwrap();
+    assert!(!items.is_empty(), "expected at least one catalog item");
+}
+
+#[tokio::test]
+#[ignore]
+async fn catalog_list_filtered() {
+    let c = client();
+    let items = c.catalog().list(Some("retail"), None).await.unwrap();
+    for item in &items {
+        assert_eq!(item.slug, "retail");
+    }
+}
+
 // ===========================================================================
 // Usage
 // ===========================================================================
@@ -79,10 +95,8 @@ async fn catalog_get_sector_not_found() {
 #[ignore]
 async fn usage_summary() {
     let c = client();
-    let summary = c.usage().summary().await.unwrap();
-    // Balance can be zero, but the fields should parse correctly
+    let summary = c.usage().summary(None).await.unwrap();
     assert!(summary.period_days > 0);
-    assert!(!summary.tier.is_empty());
 }
 
 #[tokio::test]
@@ -90,7 +104,6 @@ async fn usage_summary() {
 async fn usage_daily() {
     let c = client();
     let resp = c.usage().daily(Some(7)).await.unwrap();
-    // daily may be empty if no usage, but the struct should parse
     assert!(resp.daily.len() <= 7);
 }
 
@@ -110,8 +123,7 @@ async fn jobs_list() {
         })
         .await
         .unwrap();
-    // May be empty on a fresh account, but should parse
-    for job in &list.jobs {
+    for job in &list.data {
         assert!(!job.id.is_empty());
         assert!(!job.status.is_empty());
     }
@@ -145,24 +157,19 @@ async fn jobs_generate_quick_and_download() {
         vec![TableSpec {
             name: "journal_entries".to_string(),
             rows: 10,
+            base_rate: None,
         }],
         "retail",
     );
 
-    let job = c.jobs().generate_quick(&req).await.unwrap();
-    assert_eq!(job.status, "completed");
-    assert!(job.rows_generated.unwrap_or(0) > 0);
-    assert!(job.credits_used.unwrap_or(0) > 0);
+    let resp = c.jobs().generate_quick(&req).await.unwrap();
+    assert_eq!(resp.status, "completed");
+    assert!(resp.rows_generated > 0);
+    assert!(resp.credits_used > 0);
 
-    // Verify we can fetch the same job by ID
-    let fetched = c.jobs().get(&job.id).await.unwrap();
-    assert_eq!(fetched.id, job.id);
-    assert_eq!(fetched.status, "completed");
-
-    // Download the output URL
-    let dl = c.jobs().download(&job.id).await.unwrap();
-    assert!(!dl.url.is_empty());
-    assert!(dl.expires_in > 0);
+    // Download the output
+    let bytes = c.jobs().download(&resp.id).await.unwrap();
+    assert!(!bytes.is_empty());
 }
 
 #[tokio::test]
@@ -174,6 +181,7 @@ async fn jobs_generate_async() {
         vec![TableSpec {
             name: "journal_entries".to_string(),
             rows: 10,
+            base_rate: None,
         }],
         "retail",
     );
@@ -189,11 +197,11 @@ async fn jobs_generate_async() {
 async fn jobs_generate_validation_error() {
     let c = client();
 
-    // Empty tables should fail validation
     let req = GenerateRequest {
         tables: vec![],
         format: None,
-        sector_slug: "retail".to_string(),
+        sector_slug: Some("retail".to_string()),
+        options: None,
     };
 
     let err = c.jobs().generate_quick(&req).await.unwrap_err();
@@ -217,9 +225,7 @@ async fn api_keys_lifecycle() {
         .api_keys()
         .create(&CreateApiKeyRequest {
             name: "integration-test-key".to_string(),
-            scopes: Some(vec!["catalog:read".to_string()]),
             environment: Some("test".to_string()),
-            expires_in_days: Some(1),
         })
         .await
         .unwrap();
@@ -263,41 +269,55 @@ async fn api_keys_lifecycle() {
     assert_eq!(updated.name, "integration-test-key-updated");
 
     // Revoke (cleanup)
-    c.api_keys().revoke(&key_id).await.unwrap();
-
-    // Verify it's gone / revoked
-    let keys_after = c.api_keys().list().await.unwrap();
-    let revoked = keys_after.iter().find(|k| k.id == key_id);
-    // Either the key is absent or its status is "revoked"
-    if let Some(k) = revoked {
-        assert_eq!(k.status, "revoked");
-    }
+    let revoked = c.api_keys().revoke(&key_id).await.unwrap();
+    assert_eq!(revoked.id, key_id);
+    assert_eq!(revoked.status, "revoked");
 }
 
 // ===========================================================================
-// Credits
+// Quality
 // ===========================================================================
 
 #[tokio::test]
 #[ignore]
-async fn credits_balance() {
+async fn quality_scores() {
     let c = client();
-    let balance = c.credits().balance().await.unwrap();
-    // total_prepaid_credits may be 0, but the struct should parse
-    assert!(balance.total_prepaid_credits >= 0);
+    let scores = c.quality().scores().await.unwrap();
+    for s in &scores {
+        assert!(!s.id.is_empty());
+        assert!(s.overall_score >= 0.0);
+    }
 }
 
 #[tokio::test]
 #[ignore]
-async fn credits_history() {
+async fn quality_timeline() {
     let c = client();
-    let history = c.credits().history().await.unwrap();
-    // batches may be empty on a fresh account
-    for batch in &history.batches {
-        assert!(!batch.batch_id.is_empty());
-        assert!(!batch.pack.is_empty());
+    let timeline = c.quality().timeline(Some(7)).await.unwrap();
+    for day in &timeline {
+        assert!(day.score >= 0.0);
     }
 }
 
-// Note: credits_purchase is NOT tested — it would create a real Stripe
-// checkout session and potentially charge money.
+// ===========================================================================
+// Billing
+// ===========================================================================
+
+#[tokio::test]
+#[ignore]
+async fn billing_subscription() {
+    let c = client();
+    let sub = c.billing().subscription().await.unwrap();
+    assert!(!sub.tier.is_empty());
+    assert!(!sub.status.is_empty());
+}
+
+#[tokio::test]
+#[ignore]
+async fn billing_invoices() {
+    let c = client();
+    let invoices = c.billing().invoices().await.unwrap();
+    for inv in &invoices {
+        assert!(!inv.id.is_empty());
+    }
+}

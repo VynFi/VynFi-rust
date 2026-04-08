@@ -32,11 +32,6 @@ pub struct Client {
 
 impl Client {
     /// Returns a [`ClientBuilder`] that accepts an API key.
-    ///
-    /// ```no_run
-    /// # use vynfi::blocking::Client;
-    /// let client = Client::builder("vf_live_abc123").build().unwrap();
-    /// ```
     pub fn builder(api_key: impl Into<String>) -> ClientBuilder {
         ClientBuilder {
             api_key: api_key.into(),
@@ -48,32 +43,33 @@ impl Client {
 
     // -- Resource accessors ---------------------------------------------------
 
-    /// Jobs resource — submit, list, get, and download generation jobs.
     pub fn jobs(&self) -> Jobs<'_> {
         Jobs { client: self }
     }
 
-    /// Catalog resource — list sectors and tables.
     pub fn catalog(&self) -> Catalog<'_> {
         Catalog { client: self }
     }
 
-    /// Usage resource — credit balance and daily usage breakdown.
     pub fn usage(&self) -> Usage<'_> {
         Usage { client: self }
     }
 
-    /// API-key management resource.
     pub fn api_keys(&self) -> ApiKeys<'_> {
         ApiKeys { client: self }
     }
 
-    /// Credits resource — purchase packs and view prepaid balance.
-    pub fn credits(&self) -> Credits<'_> {
-        Credits { client: self }
+    pub fn quality(&self) -> Quality<'_> {
+        Quality { client: self }
     }
 
-    // -- Internal helper ------------------------------------------------------
+    pub fn webhooks(&self) -> Webhooks<'_> {
+        Webhooks { client: self }
+    }
+
+    pub fn billing(&self) -> Billing<'_> {
+        Billing { client: self }
+    }
 
     fn block_on<F: std::future::Future>(&self, f: F) -> F::Output {
         self.rt.block_on(f)
@@ -84,18 +80,6 @@ impl Client {
 // ClientBuilder
 // ---------------------------------------------------------------------------
 
-/// Builder for configuring and constructing a blocking [`Client`].
-///
-/// ```no_run
-/// # use vynfi::blocking::Client;
-/// # use std::time::Duration;
-/// let client = Client::builder("vf_live_abc123")
-///     .base_url("https://staging-api.vynfi.com")
-///     .timeout(Duration::from_secs(60))
-///     .max_retries(3)
-///     .build()
-///     .unwrap();
-/// ```
 pub struct ClientBuilder {
     api_key: String,
     base_url: Option<String>,
@@ -104,28 +88,21 @@ pub struct ClientBuilder {
 }
 
 impl ClientBuilder {
-    /// Override the base URL (trailing slashes are stripped).
     pub fn base_url(mut self, url: impl Into<String>) -> Self {
         self.base_url = Some(url.into());
         self
     }
 
-    /// Set the request timeout (default: 30 s).
     pub fn timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
         self
     }
 
-    /// Set the maximum number of automatic retries on 429 / 5xx (default: 2).
     pub fn max_retries(mut self, retries: u32) -> Self {
         self.max_retries = Some(retries);
         self
     }
 
-    /// Build the blocking [`Client`].
-    ///
-    /// Returns an error if the API key is empty, the underlying HTTP client
-    /// cannot be constructed, or the Tokio runtime fails to initialise.
     pub fn build(self) -> Result<Client, VynFiError> {
         let mut builder = crate::Client::builder(&self.api_key);
         if let Some(url) = self.base_url {
@@ -152,60 +129,85 @@ impl ClientBuilder {
 // Jobs
 // ---------------------------------------------------------------------------
 
-/// Blocking handle for the Jobs resource.
 pub struct Jobs<'a> {
     client: &'a Client,
 }
 
 impl Jobs<'_> {
-    /// Submit an asynchronous generation job.
     pub fn generate(&self, req: &GenerateRequest) -> Result<SubmitJobResponse, VynFiError> {
         self.client.block_on(self.client.inner.jobs().generate(req))
     }
 
-    /// Submit a job and poll until completion, returning the finished [`Job`].
-    pub fn generate_quick(&self, req: &GenerateRequest) -> Result<Job, VynFiError> {
+    pub fn generate_config(
+        &self,
+        req: &GenerateConfigRequest,
+    ) -> Result<SubmitJobResponse, VynFiError> {
+        self.client
+            .block_on(self.client.inner.jobs().generate_config(req))
+    }
+
+    pub fn generate_quick(&self, req: &GenerateRequest) -> Result<QuickJobResponse, VynFiError> {
         self.client
             .block_on(self.client.inner.jobs().generate_quick(req))
     }
 
-    /// List jobs with optional filtering and pagination.
     pub fn list(&self, params: &crate::ListJobsParams) -> Result<JobList, VynFiError> {
         self.client.block_on(self.client.inner.jobs().list(params))
     }
 
-    /// Get a single job by ID.
     pub fn get(&self, job_id: &str) -> Result<Job, VynFiError> {
         self.client.block_on(self.client.inner.jobs().get(job_id))
     }
 
-    /// Get a presigned download URL for a completed job's output.
-    pub fn download(&self, job_id: &str) -> Result<DownloadResponse, VynFiError> {
+    pub fn cancel(&self, job_id: &str) -> Result<CancelJobResponse, VynFiError> {
+        self.client
+            .block_on(self.client.inner.jobs().cancel(job_id))
+    }
+
+    pub fn download(&self, job_id: &str) -> Result<bytes::Bytes, VynFiError> {
         self.client
             .block_on(self.client.inner.jobs().download(job_id))
     }
+
+    pub fn download_file(&self, job_id: &str, file: &str) -> Result<bytes::Bytes, VynFiError> {
+        self.client
+            .block_on(self.client.inner.jobs().download_file(job_id, file))
+    }
+
+    // Note: no stream() — SSE streaming does not make sense in blocking mode.
 }
 
 // ---------------------------------------------------------------------------
 // Catalog
 // ---------------------------------------------------------------------------
 
-/// Blocking handle for the Catalog resource.
 pub struct Catalog<'a> {
     client: &'a Client,
 }
 
 impl Catalog<'_> {
-    /// List all available sectors (summary only, no tables).
     pub fn list_sectors(&self) -> Result<Vec<SectorSummary>, VynFiError> {
         self.client
             .block_on(self.client.inner.catalog().list_sectors())
     }
 
-    /// Get full details for a sector, including its tables and columns.
     pub fn get_sector(&self, slug: &str) -> Result<Sector, VynFiError> {
         self.client
             .block_on(self.client.inner.catalog().get_sector(slug))
+    }
+
+    pub fn list(
+        &self,
+        sector: Option<&str>,
+        search: Option<&str>,
+    ) -> Result<Vec<CatalogItem>, VynFiError> {
+        self.client
+            .block_on(self.client.inner.catalog().list(sector, search))
+    }
+
+    pub fn get_fingerprint(&self, sector: &str, profile: &str) -> Result<Fingerprint, VynFiError> {
+        self.client
+            .block_on(self.client.inner.catalog().get_fingerprint(sector, profile))
     }
 }
 
@@ -213,19 +215,17 @@ impl Catalog<'_> {
 // Usage
 // ---------------------------------------------------------------------------
 
-/// Blocking handle for the Usage resource.
 pub struct Usage<'a> {
     client: &'a Client,
 }
 
 impl Usage<'_> {
-    /// Get a summary of credit balance and usage statistics.
-    pub fn summary(&self) -> Result<UsageSummary, VynFiError> {
-        self.client.block_on(self.client.inner.usage().summary())
+    pub fn summary(&self, days: Option<i32>) -> Result<UsageSummary, VynFiError> {
+        self.client
+            .block_on(self.client.inner.usage().summary(days))
     }
 
-    /// Get daily usage breakdown with per-table totals.
-    pub fn daily(&self, days: Option<u32>) -> Result<DailyUsageResponse, VynFiError> {
+    pub fn daily(&self, days: Option<i32>) -> Result<DailyUsageResponse, VynFiError> {
         self.client.block_on(self.client.inner.usage().daily(days))
     }
 }
@@ -234,68 +234,127 @@ impl Usage<'_> {
 // ApiKeys
 // ---------------------------------------------------------------------------
 
-/// Blocking handle for the API Keys resource.
 pub struct ApiKeys<'a> {
     client: &'a Client,
 }
 
 impl ApiKeys<'_> {
-    /// Create a new API key.
     pub fn create(&self, req: &CreateApiKeyRequest) -> Result<ApiKeyCreated, VynFiError> {
         self.client
             .block_on(self.client.inner.api_keys().create(req))
     }
 
-    /// List all API keys for the authenticated user.
     pub fn list(&self) -> Result<Vec<ApiKey>, VynFiError> {
         self.client.block_on(self.client.inner.api_keys().list())
     }
 
-    /// Get a single API key by ID.
     pub fn get(&self, key_id: &str) -> Result<ApiKey, VynFiError> {
         self.client
             .block_on(self.client.inner.api_keys().get(key_id))
     }
 
-    /// Update an API key's name or scopes.
     pub fn update(&self, key_id: &str, req: &UpdateApiKeyRequest) -> Result<ApiKey, VynFiError> {
         self.client
             .block_on(self.client.inner.api_keys().update(key_id, req))
     }
 
-    /// Revoke (delete) an API key.
-    pub fn revoke(&self, key_id: &str) -> Result<(), VynFiError> {
+    pub fn revoke(&self, key_id: &str) -> Result<RevokeKeyResponse, VynFiError> {
         self.client
             .block_on(self.client.inner.api_keys().revoke(key_id))
     }
 }
 
 // ---------------------------------------------------------------------------
-// Credits
+// Quality
 // ---------------------------------------------------------------------------
 
-/// Blocking handle for the Credits resource.
-pub struct Credits<'a> {
+pub struct Quality<'a> {
     client: &'a Client,
 }
 
-impl Credits<'_> {
-    /// Purchase a credit pack. Returns a Stripe checkout URL.
-    pub fn purchase(
-        &self,
-        req: &PurchaseCreditsRequest,
-    ) -> Result<PurchaseCreditsResponse, VynFiError> {
+impl Quality<'_> {
+    pub fn scores(&self) -> Result<Vec<QualityScore>, VynFiError> {
+        self.client.block_on(self.client.inner.quality().scores())
+    }
+
+    pub fn timeline(&self, days: Option<i64>) -> Result<Vec<DailyQuality>, VynFiError> {
         self.client
-            .block_on(self.client.inner.credits().purchase(req))
+            .block_on(self.client.inner.quality().timeline(days))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Webhooks
+// ---------------------------------------------------------------------------
+
+pub struct Webhooks<'a> {
+    client: &'a Client,
+}
+
+impl Webhooks<'_> {
+    pub fn create(&self, req: &CreateWebhookRequest) -> Result<WebhookCreated, VynFiError> {
+        self.client
+            .block_on(self.client.inner.webhooks().create(req))
     }
 
-    /// Get the current prepaid credit balance and active batches.
-    pub fn balance(&self) -> Result<CreditBalance, VynFiError> {
-        self.client.block_on(self.client.inner.credits().balance())
+    pub fn list(&self) -> Result<Vec<Webhook>, VynFiError> {
+        self.client.block_on(self.client.inner.webhooks().list())
     }
 
-    /// Get full credit purchase history with batch details.
-    pub fn history(&self) -> Result<CreditHistory, VynFiError> {
-        self.client.block_on(self.client.inner.credits().history())
+    pub fn get(&self, webhook_id: &str) -> Result<WebhookDetail, VynFiError> {
+        self.client
+            .block_on(self.client.inner.webhooks().get(webhook_id))
+    }
+
+    pub fn update(
+        &self,
+        webhook_id: &str,
+        req: &UpdateWebhookRequest,
+    ) -> Result<Webhook, VynFiError> {
+        self.client
+            .block_on(self.client.inner.webhooks().update(webhook_id, req))
+    }
+
+    pub fn delete(&self, webhook_id: &str) -> Result<(), VynFiError> {
+        self.client
+            .block_on(self.client.inner.webhooks().delete(webhook_id))
+    }
+
+    pub fn test(&self, webhook_id: &str) -> Result<serde_json::Value, VynFiError> {
+        self.client
+            .block_on(self.client.inner.webhooks().test(webhook_id))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Billing
+// ---------------------------------------------------------------------------
+
+pub struct Billing<'a> {
+    client: &'a Client,
+}
+
+impl Billing<'_> {
+    pub fn subscription(&self) -> Result<Subscription, VynFiError> {
+        self.client
+            .block_on(self.client.inner.billing().subscription())
+    }
+
+    pub fn checkout(&self, req: &CheckoutRequest) -> Result<CheckoutResponse, VynFiError> {
+        self.client
+            .block_on(self.client.inner.billing().checkout(req))
+    }
+
+    pub fn portal(&self) -> Result<PortalResponse, VynFiError> {
+        self.client.block_on(self.client.inner.billing().portal())
+    }
+
+    pub fn invoices(&self) -> Result<Vec<Invoice>, VynFiError> {
+        self.client.block_on(self.client.inner.billing().invoices())
+    }
+
+    pub fn payment_method(&self) -> Result<serde_json::Value, VynFiError> {
+        self.client
+            .block_on(self.client.inner.billing().payment_method())
     }
 }

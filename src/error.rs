@@ -1,16 +1,5 @@
 use serde::Deserialize;
 
-/// A single field-level validation error.
-#[derive(Debug, Clone, Deserialize)]
-pub struct FieldError {
-    #[serde(default)]
-    pub field: String,
-    #[serde(default)]
-    pub message: String,
-    #[serde(default)]
-    pub code: String,
-}
-
 /// Structured error body from the VynFi API (RFC 7807).
 #[derive(Debug, Clone, Deserialize)]
 pub struct ErrorBody {
@@ -26,12 +15,9 @@ pub struct ErrorBody {
     /// Detailed error description.
     #[serde(default)]
     pub detail: String,
-    /// Request ID for support reference.
+    /// URI identifying the specific occurrence.
     #[serde(default)]
-    pub request_id: String,
-    /// Field-level validation errors (present on 422 responses).
-    #[serde(default)]
-    pub fields: Vec<FieldError>,
+    pub instance: Option<String>,
 }
 
 impl std::fmt::Display for ErrorBody {
@@ -53,7 +39,7 @@ pub enum VynFiError {
     #[error("authentication error: {0}")]
     Authentication(Box<ErrorBody>),
 
-    /// 402 — not enough credits.
+    /// 402 — insufficient credits.
     #[error("insufficient credits: {0}")]
     InsufficientCredits(Box<ErrorBody>),
 

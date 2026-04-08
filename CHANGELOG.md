@@ -6,36 +6,49 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- **Credits resource** (`client.credits()`) — `purchase`, `balance`, `history` for prepaid credit pack management.
-- `DownloadResponse` type — `jobs().download()` now returns a presigned URL with expiry instead of raw bytes.
 - `VynFiError::Forbidden` variant for 403 responses.
-- `FieldError` struct and `ErrorBody.fields` for field-level validation errors.
-- `ErrorBody` now includes `error_type`, `title`, `request_id` fields (RFC 7807).
-- `Job` fields: `user_id`, `rows_requested`, `rows_generated`, `started_at`.
-- `SubmitJobResponse` fields: `object`, `message`.
-- `SectorSummary` fields: `multiplier`, `quality_score`, `popularity`.
-- `UsageSummary.tier` field.
-- `environment` field on `ApiKey`, `ApiKeyCreated`, and `CreateApiKeyRequest`.
+- `ErrorBody` now follows RFC 7807 with `error_type`, `title`, `detail`, `status`, `instance`.
+- `ErrorBody` variants in `VynFiError` are `Box<ErrorBody>` to reduce enum size.
+- `GenerateConfigRequest` for config-based generation (portal-style).
+- `QuickJobResponse` type for synchronous generation results.
+- `CancelJobResponse` type with credit refund details.
+- `jobs().generate_config()` for config-based generation requests.
+- `jobs().download_file()` to download a specific file from job output.
+- `catalog().list()` now accepts optional `sector` and `search` filters.
+- `billing().checkout()` and `billing().portal()` for Stripe session creation.
+- `WebhookDetail` type with delivery history on `webhooks().get()`.
+- `RevokeKeyResponse` type — `api_keys().revoke()` now returns `{id, status, revoked_at}`.
+- `TableUsage` type — `by_table` in daily usage is now a structured array.
+- `Column.example_values`, `TableDef.id`, `TableDef.slug`, `SectorSummary.id` fields.
 - Integration test suite (`tests/integration.rs`) for all endpoints against a real API.
 
 ### Changed
 
-- `jobs().download()` returns `DownloadResponse` (JSON with presigned URL) instead of `bytes::Bytes`.
-- `usage().summary()` now calls `/v1/usage` (was `/v1/usage/summary`).
-- `GenerateRequest.format` changed from `String` to `Option<String>` (server defaults to JSON).
+- Sector endpoints moved from `/v1/catalog/sectors` to `/v1/sectors`.
+- `Job` fields: `user_id`→`owner_id`, `tables`/`format`/`sector_slug`→`config` (JSON), added `progress` (JSON), `artifacts`, `error_detail`.
+- `SubmitJobResponse`: restored `links` and `estimated_duration_seconds`.
+- `SectorSummary`: `quality_score` is now `i32`, `popularity` is now `i32`.
+- `UsageSummary`: `burn_rate` is now `i64`, `period_days` is now `i32`. Removed `tier`.
+- `DailyUsageResponse.by_table` changed from `HashMap<String, i64>` to `Vec<TableUsage>`.
+- `ApiKey`/`ApiKeyCreated`: removed `scopes` and `expires_at` fields, added `revoked_at`.
+- `CreateApiKeyRequest`: simplified to `name` and `environment` only.
+- `usage().summary()` now accepts optional `days` parameter.
+- `quality().timeline()` parameter changed from `Option<u32>` to `Option<i64>`.
+- `jobs().list()` uses offset/limit pagination instead of cursor-based.
+- `GenerateRequest`: `format` is `Option<String>`, `sector_slug` is `Option<String>`.
 - `GenerateRequest::new()` now takes a `sector_slug` parameter.
-- `ErrorBody` variants in `VynFiError` are now `Box<ErrorBody>` to reduce enum size.
+- `Invoice` fields updated to match Stripe format (`number`, `amount_due`, `amount_paid`, `hosted_invoice_url`).
+- `Subscription` fields updated (`stripe_price_id` instead of `cancel_at_period_end`).
+- `Billing` resource: `payment_method()` returns `serde_json::Value` (raw Stripe object).
 
 ### Removed
 
-- **Quality resource** (`client.quality()`) — not in stabilized API.
-- **Webhooks resource** (`client.webhooks()`) — not in stabilized API.
-- **Billing resource** (`client.billing()`) — not in stabilized API.
-- `jobs().cancel()` — no cancel endpoint in API.
-- `jobs().stream()` — no SSE streaming endpoint in API.
-- `catalog().list()` and `catalog().get_fingerprint()` — no such endpoints in API.
-- Types: `JobLinks`, `JobProgress`, `SseEvent`, `CatalogItem`, `Fingerprint`, `QualityScore`, `DailyQuality`, `Webhook`, `WebhookCreated`, `CreateWebhookRequest`, `UpdateWebhookRequest`, `Subscription`, `Invoice`, `PaymentMethod`.
-- Dependencies: `reqwest-eventsource`, `futures-core`, `bytes`.
+- `FieldError` struct and `ErrorBody.fields` — not in the API.
+- `ErrorBody.request_id` — replaced by `instance`.
+- `JobProgress` struct — progress is now `serde_json::Value`.
+- `DownloadResponse` type — download returns raw bytes.
+- `CreditBalance`, `CreditBatch`, `CreditHistory`, `CreditHistoryBatch`, `PurchaseCreditsRequest`, `PurchaseCreditsResponse` — credits resource removed.
+- **Credits resource** (`client.credits()`) — not in the API.
 
 ## [0.1.0] - 2026-03-01
 
