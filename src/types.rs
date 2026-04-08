@@ -7,58 +7,36 @@ use serde::{Deserialize, Serialize};
 // Jobs
 // ---------------------------------------------------------------------------
 
-/// Links returned with a submitted job.
-#[derive(Debug, Clone, Deserialize)]
-pub struct JobLinks {
-    #[serde(rename = "self", default)]
-    pub self_link: String,
-    #[serde(default)]
-    pub stream: String,
-    #[serde(default)]
-    pub cancel: String,
-    #[serde(default)]
-    pub download: String,
-}
-
-/// Progress information for a running job.
-#[derive(Debug, Clone, Deserialize)]
-pub struct JobProgress {
-    #[serde(default)]
-    pub percent: u32,
-    #[serde(default)]
-    pub rows_generated: u64,
-    #[serde(default)]
-    pub rows_total: u64,
-}
-
 /// A generation job.
 #[derive(Debug, Clone, Deserialize)]
 pub struct Job {
     pub id: String,
+    pub user_id: Option<String>,
     pub status: String,
     pub tables: Option<serde_json::Value>,
     #[serde(default = "default_format")]
     pub format: String,
+    pub sector_slug: String,
+    pub rows_requested: Option<i64>,
+    pub rows_generated: Option<i64>,
     pub credits_reserved: Option<i64>,
     pub credits_used: Option<i64>,
-    pub sector_slug: String,
-    pub progress: Option<JobProgress>,
     pub output_path: Option<String>,
     pub error: Option<String>,
     pub created_at: Option<DateTime<Utc>>,
+    pub started_at: Option<DateTime<Utc>>,
     pub completed_at: Option<DateTime<Utc>>,
 }
 
-/// Response from submitting a new job.
+/// Response from submitting an async generation job.
 #[derive(Debug, Clone, Deserialize)]
 pub struct SubmitJobResponse {
+    pub object: Option<String>,
     pub id: String,
     pub status: String,
     #[serde(default)]
     pub credits_reserved: i64,
-    #[serde(default)]
-    pub estimated_duration_seconds: u64,
-    pub links: Option<JobLinks>,
+    pub message: Option<String>,
 }
 
 /// Paginated list of jobs.
@@ -81,19 +59,32 @@ pub struct TableSpec {
 #[derive(Debug, Clone, Serialize)]
 pub struct GenerateRequest {
     pub tables: Vec<TableSpec>,
-    pub format: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub format: Option<String>,
     pub sector_slug: String,
 }
 
 impl GenerateRequest {
     /// Create a new generate request with sensible defaults.
-    pub fn new(tables: Vec<TableSpec>) -> Self {
+    pub fn new(tables: Vec<TableSpec>, sector_slug: impl Into<String>) -> Self {
         Self {
             tables,
-            format: "json".to_string(),
-            sector_slug: "retail".to_string(),
+            format: None,
+            sector_slug: sector_slug.into(),
         }
     }
+}
+
+/// Response from the download endpoint (presigned URL).
+#[derive(Debug, Clone, Deserialize)]
+pub struct DownloadResponse {
+    pub object: Option<String>,
+    pub url: String,
+    pub expires_in: u64,
+}
+
+fn default_format() -> String {
+    "json".to_string()
 }
 
 // ---------------------------------------------------------------------------
@@ -141,10 +132,6 @@ fn default_multiplier() -> f64 {
     1.0
 }
 
-fn default_format() -> String {
-    "json".to_string()
-}
-
 /// Abbreviated sector information (no tables).
 #[derive(Debug, Clone, Deserialize)]
 pub struct SectorSummary {
@@ -152,28 +139,11 @@ pub struct SectorSummary {
     pub name: String,
     pub description: String,
     pub icon: String,
+    #[serde(default = "default_multiplier")]
+    pub multiplier: f64,
+    pub quality_score: Option<f64>,
+    pub popularity: Option<u32>,
     pub table_count: u32,
-}
-
-/// A catalog item.
-#[derive(Debug, Clone, Deserialize)]
-pub struct CatalogItem {
-    pub sector: String,
-    pub profile: String,
-    pub name: String,
-    pub description: String,
-    pub source: String,
-}
-
-/// A fingerprint definition with column details.
-#[derive(Debug, Clone, Deserialize)]
-pub struct Fingerprint {
-    pub sector: String,
-    pub profile: String,
-    pub name: String,
-    pub description: String,
-    pub source: String,
-    pub columns: Vec<Column>,
 }
 
 // ---------------------------------------------------------------------------
@@ -190,6 +160,8 @@ pub struct UsageSummary {
     pub burn_rate: f64,
     #[serde(default = "default_period_days")]
     pub period_days: u32,
+    #[serde(default)]
+    pub tier: String,
 }
 
 fn default_period_days() -> u32 {
@@ -220,6 +192,8 @@ pub struct ApiKey {
     pub id: String,
     pub name: String,
     pub prefix: String,
+    #[serde(default)]
+    pub environment: String,
     pub scopes: Vec<String>,
     #[serde(default = "default_active")]
     pub status: String,
@@ -239,6 +213,8 @@ pub struct ApiKeyCreated {
     pub name: String,
     pub key: String,
     pub prefix: String,
+    #[serde(default)]
+    pub environment: String,
     pub scopes: Vec<String>,
     pub expires_at: Option<DateTime<Utc>>,
     pub created_at: Option<DateTime<Utc>>,
@@ -248,126 +224,77 @@ pub struct ApiKeyCreated {
 #[derive(Debug, Clone, Serialize)]
 pub struct CreateApiKeyRequest {
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub scopes: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub environment: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub expires_in_days: Option<u32>,
 }
 
 /// Request body for updating an API key.
 #[derive(Debug, Clone, Serialize)]
 pub struct UpdateApiKeyRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub scopes: Option<Vec<String>>,
 }
 
 // ---------------------------------------------------------------------------
-// Quality
+// Credits
 // ---------------------------------------------------------------------------
 
-/// Quality score for a generated table.
-#[derive(Debug, Clone, Deserialize)]
-pub struct QualityScore {
-    pub id: String,
-    pub job_id: String,
-    pub table_type: String,
-    pub rows: u64,
-    pub overall_score: f64,
-    pub benford_score: f64,
-    pub correlation_score: f64,
-    pub distribution_score: f64,
-    pub created_at: Option<DateTime<Utc>>,
-}
-
-/// Aggregate quality score for a single day.
-#[derive(Debug, Clone, Deserialize)]
-pub struct DailyQuality {
-    pub date: NaiveDate,
-    pub score: f64,
-}
-
-// ---------------------------------------------------------------------------
-// Webhooks
-// ---------------------------------------------------------------------------
-
-/// An existing webhook.
-#[derive(Debug, Clone, Deserialize)]
-pub struct Webhook {
-    pub id: String,
-    pub url: String,
-    pub events: Vec<String>,
-    #[serde(default = "default_active")]
-    pub status: String,
-    pub secret: Option<String>,
-    pub created_at: Option<DateTime<Utc>>,
-    pub updated_at: Option<DateTime<Utc>>,
-}
-
-/// A newly created webhook (includes the signing secret).
-#[derive(Debug, Clone, Deserialize)]
-pub struct WebhookCreated {
-    pub id: String,
-    pub url: String,
-    pub events: Vec<String>,
-    pub secret: String,
-    pub created_at: Option<DateTime<Utc>>,
-}
-
-/// Request body for creating a webhook.
+/// Request body for purchasing a credit pack.
 #[derive(Debug, Clone, Serialize)]
-pub struct CreateWebhookRequest {
-    pub url: String,
-    pub events: Vec<String>,
+pub struct PurchaseCreditsRequest {
+    pub pack: String,
 }
 
-/// Request body for updating a webhook.
-#[derive(Debug, Clone, Serialize)]
-pub struct UpdateWebhookRequest {
-    pub url: Option<String>,
-    pub events: Option<Vec<String>>,
-    pub status: Option<String>,
-}
-
-// ---------------------------------------------------------------------------
-// Billing
-// ---------------------------------------------------------------------------
-
-/// Subscription details.
+/// Response from purchasing credits (Stripe checkout URL).
 #[derive(Debug, Clone, Deserialize)]
-pub struct Subscription {
-    #[serde(default = "default_free")]
-    pub tier: String,
-    #[serde(default = "default_active")]
+pub struct PurchaseCreditsResponse {
+    pub checkout_url: String,
+}
+
+/// A single prepaid credit batch.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreditBatch {
+    pub batch_id: String,
+    pub pack: String,
+    pub credits_remaining: i64,
+    pub credits_purchased: i64,
+    pub expires_at: Option<DateTime<Utc>>,
     pub status: String,
-    pub current_period_end: Option<DateTime<Utc>>,
+}
+
+/// Prepaid credit balance.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreditBalance {
+    pub total_prepaid_credits: i64,
+    pub batches: Vec<CreditBatch>,
+}
+
+/// A credit batch with full history details.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreditHistoryBatch {
+    pub batch_id: String,
+    pub user_id: Option<String>,
+    pub pack: String,
+    pub credits_purchased: i64,
+    pub credits_remaining: i64,
     #[serde(default)]
-    pub cancel_at_period_end: bool,
-}
-
-fn default_free() -> String {
-    "free".to_string()
-}
-
-/// An invoice.
-#[derive(Debug, Clone, Deserialize)]
-pub struct Invoice {
-    pub id: String,
-    pub amount: i64,
-    #[serde(default = "default_usd")]
-    pub currency: String,
+    pub credits_forfeited: i64,
     pub status: String,
-    pub created_at: Option<DateTime<Utc>>,
-    pub pdf_url: Option<String>,
+    pub purchased_at: Option<DateTime<Utc>>,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub stripe_payment_id: Option<String>,
+    pub refund_id: Option<String>,
+    pub dispute_id: Option<String>,
 }
 
-fn default_usd() -> String {
-    "usd".to_string()
-}
-
-/// A payment method on file.
+/// Credit purchase history.
 #[derive(Debug, Clone, Deserialize)]
-pub struct PaymentMethod {
-    pub r#type: String,
-    pub brand: String,
-    pub last4: String,
-    pub exp_month: u32,
-    pub exp_year: u32,
+pub struct CreditHistory {
+    pub batches: Vec<CreditHistoryBatch>,
 }

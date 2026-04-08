@@ -21,8 +21,6 @@ mod types;
 pub mod blocking;
 
 pub use client::{Client, ClientBuilder};
-pub use error::{ErrorBody, VynFiError};
-pub use resources::{
-    ApiKeys, Billing, Catalog, Jobs, ListJobsParams, Quality, SseEvent, Usage, Webhooks,
-};
+pub use error::{ErrorBody, FieldError, VynFiError};
+pub use resources::{ApiKeys, Catalog, Credits, Jobs, ListJobsParams, Usage};
 pub use types::*;

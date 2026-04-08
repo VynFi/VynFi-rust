@@ -48,12 +48,12 @@ impl Client {
 
     // -- Resource accessors ---------------------------------------------------
 
-    /// Jobs resource — submit, list, get, cancel, and download generation jobs.
+    /// Jobs resource — submit, list, get, and download generation jobs.
     pub fn jobs(&self) -> Jobs<'_> {
         Jobs { client: self }
     }
 
-    /// Catalog resource — list sectors, tables, and fingerprints.
+    /// Catalog resource — list sectors and tables.
     pub fn catalog(&self) -> Catalog<'_> {
         Catalog { client: self }
     }
@@ -68,19 +68,9 @@ impl Client {
         ApiKeys { client: self }
     }
 
-    /// Quality metrics resource.
-    pub fn quality(&self) -> Quality<'_> {
-        Quality { client: self }
-    }
-
-    /// Webhooks resource — CRUD and delivery history.
-    pub fn webhooks(&self) -> Webhooks<'_> {
-        Webhooks { client: self }
-    }
-
-    /// Billing resource — subscription, invoices, payment methods.
-    pub fn billing(&self) -> Billing<'_> {
-        Billing { client: self }
+    /// Credits resource — purchase packs and view prepaid balance.
+    pub fn credits(&self) -> Credits<'_> {
+        Credits { client: self }
     }
 
     // -- Internal helper ------------------------------------------------------
@@ -189,19 +179,11 @@ impl Jobs<'_> {
         self.client.block_on(self.client.inner.jobs().get(job_id))
     }
 
-    /// Cancel a running job.
-    pub fn cancel(&self, job_id: &str) -> Result<Job, VynFiError> {
-        self.client
-            .block_on(self.client.inner.jobs().cancel(job_id))
-    }
-
-    /// Download the output of a completed job as raw bytes.
-    pub fn download(&self, job_id: &str) -> Result<bytes::Bytes, VynFiError> {
+    /// Get a presigned download URL for a completed job's output.
+    pub fn download(&self, job_id: &str) -> Result<DownloadResponse, VynFiError> {
         self.client
             .block_on(self.client.inner.jobs().download(job_id))
     }
-
-    // Note: no stream() — SSE streaming does not make sense in blocking mode.
 }
 
 // ---------------------------------------------------------------------------
@@ -224,17 +206,6 @@ impl Catalog<'_> {
     pub fn get_sector(&self, slug: &str) -> Result<Sector, VynFiError> {
         self.client
             .block_on(self.client.inner.catalog().get_sector(slug))
-    }
-
-    /// List all catalog items across every sector.
-    pub fn list(&self) -> Result<Vec<CatalogItem>, VynFiError> {
-        self.client.block_on(self.client.inner.catalog().list())
-    }
-
-    /// Get a fingerprint definition by sector and profile name.
-    pub fn get_fingerprint(&self, sector: &str, profile: &str) -> Result<Fingerprint, VynFiError> {
-        self.client
-            .block_on(self.client.inner.catalog().get_fingerprint(sector, profile))
     }
 }
 
@@ -300,101 +271,31 @@ impl ApiKeys<'_> {
 }
 
 // ---------------------------------------------------------------------------
-// Quality
+// Credits
 // ---------------------------------------------------------------------------
 
-/// Blocking handle for the Quality resource.
-pub struct Quality<'a> {
+/// Blocking handle for the Credits resource.
+pub struct Credits<'a> {
     client: &'a Client,
 }
 
-impl Quality<'_> {
-    /// Get quality scores for all jobs.
-    pub fn scores(&self) -> Result<Vec<QualityScore>, VynFiError> {
-        self.client.block_on(self.client.inner.quality().scores())
-    }
-
-    /// Get a daily quality score timeline.
-    pub fn timeline(&self, days: Option<u32>) -> Result<Vec<DailyQuality>, VynFiError> {
-        self.client
-            .block_on(self.client.inner.quality().timeline(days))
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Webhooks
-// ---------------------------------------------------------------------------
-
-/// Blocking handle for the Webhooks resource.
-pub struct Webhooks<'a> {
-    client: &'a Client,
-}
-
-impl Webhooks<'_> {
-    /// Create a new webhook endpoint.
-    pub fn create(&self, req: &CreateWebhookRequest) -> Result<WebhookCreated, VynFiError> {
-        self.client
-            .block_on(self.client.inner.webhooks().create(req))
-    }
-
-    /// List all webhooks.
-    pub fn list(&self) -> Result<Vec<Webhook>, VynFiError> {
-        self.client.block_on(self.client.inner.webhooks().list())
-    }
-
-    /// Get a single webhook by ID.
-    pub fn get(&self, webhook_id: &str) -> Result<Webhook, VynFiError> {
-        self.client
-            .block_on(self.client.inner.webhooks().get(webhook_id))
-    }
-
-    /// Update a webhook's URL, events, or status.
-    pub fn update(
+impl Credits<'_> {
+    /// Purchase a credit pack. Returns a Stripe checkout URL.
+    pub fn purchase(
         &self,
-        webhook_id: &str,
-        req: &UpdateWebhookRequest,
-    ) -> Result<Webhook, VynFiError> {
+        req: &PurchaseCreditsRequest,
+    ) -> Result<PurchaseCreditsResponse, VynFiError> {
         self.client
-            .block_on(self.client.inner.webhooks().update(webhook_id, req))
+            .block_on(self.client.inner.credits().purchase(req))
     }
 
-    /// Delete a webhook.
-    pub fn delete(&self, webhook_id: &str) -> Result<(), VynFiError> {
-        self.client
-            .block_on(self.client.inner.webhooks().delete(webhook_id))
+    /// Get the current prepaid credit balance and active batches.
+    pub fn balance(&self) -> Result<CreditBalance, VynFiError> {
+        self.client.block_on(self.client.inner.credits().balance())
     }
 
-    /// Send a test event to a webhook endpoint.
-    pub fn test(&self, webhook_id: &str) -> Result<serde_json::Value, VynFiError> {
-        self.client
-            .block_on(self.client.inner.webhooks().test(webhook_id))
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Billing
-// ---------------------------------------------------------------------------
-
-/// Blocking handle for the Billing resource.
-pub struct Billing<'a> {
-    client: &'a Client,
-}
-
-impl Billing<'_> {
-    /// Get the current subscription details.
-    pub fn subscription(&self) -> Result<Subscription, VynFiError> {
-        self.client
-            .block_on(self.client.inner.billing().subscription())
-    }
-
-    /// List all invoices.
-    pub fn invoices(&self) -> Result<Vec<Invoice>, VynFiError> {
-        self.client.block_on(self.client.inner.billing().invoices())
-    }
-
-    /// Get the payment method on file.
-    pub fn payment_method(&self) -> Result<PaymentMethod, VynFiError> {
-        self.client
-            .block_on(self.client.inner.billing().payment_method())
+    /// Get full credit purchase history with batch details.
+    pub fn history(&self) -> Result<CreditHistory, VynFiError> {
+        self.client.block_on(self.client.inner.credits().history())
     }
 }

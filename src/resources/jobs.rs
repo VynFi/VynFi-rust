@@ -1,5 +1,4 @@
 use reqwest::Method;
-use reqwest_eventsource::EventSource;
 use serde::Deserialize;
 
 use crate::client::Client;
@@ -19,15 +18,6 @@ pub struct ListJobsParams {
     pub before: Option<String>,
 }
 
-/// A parsed Server-Sent Event from the job progress stream.
-#[derive(Debug, Clone)]
-pub struct SseEvent {
-    /// The event type (e.g. `"progress"`, `"complete"`, `"error"`).
-    pub event: String,
-    /// The JSON payload.
-    pub data: serde_json::Value,
-}
-
 /// Intermediate struct for deserializing the paginated jobs response.
 #[derive(Deserialize)]
 struct JobListResponse {
@@ -38,8 +28,7 @@ struct JobListResponse {
     next_cursor: Option<String>,
 }
 
-/// Jobs resource — submit, list, get, cancel, stream, and download generation
-/// jobs.
+/// Jobs resource — submit, list, get, and download generation jobs.
 pub struct Jobs<'a> {
     client: &'a Client,
 }
@@ -51,8 +40,8 @@ impl<'a> Jobs<'a> {
 
     /// Submit an asynchronous generation job.
     ///
-    /// Returns immediately with a job ID and status links. Poll the job or use
-    /// [`stream`](Self::stream) to track progress.
+    /// Returns immediately with a job ID. Poll the job via
+    /// [`get`](Self::get) to track progress.
     pub async fn generate(&self, req: &GenerateRequest) -> Result<SubmitJobResponse, VynFiError> {
         self.client
             .request_with_body(Method::POST, "/v1/generate", Some(req))
@@ -104,42 +93,10 @@ impl<'a> Jobs<'a> {
             .await
     }
 
-    /// Cancel a running job.
-    pub async fn cancel(&self, job_id: &str) -> Result<Job, VynFiError> {
+    /// Get a presigned download URL for a completed job's output.
+    pub async fn download(&self, job_id: &str) -> Result<DownloadResponse, VynFiError> {
         self.client
-            .request(Method::DELETE, &format!("/v1/jobs/{}", job_id))
+            .request(Method::GET, &format!("/v1/jobs/{}/download", job_id))
             .await
-    }
-
-    /// Open an SSE stream for real-time job progress updates.
-    ///
-    /// Returns an [`EventSource`] that implements `Stream`. Consume it with
-    /// `futures::StreamExt::next()`:
-    ///
-    /// ```ignore
-    /// use futures::StreamExt;
-    /// use reqwest_eventsource::Event;
-    ///
-    /// let mut es = client.jobs().stream("job_123");
-    /// while let Some(event) = es.next().await {
-    ///     match event {
-    ///         Ok(Event::Message(msg)) => println!("{}: {}", msg.event, msg.data),
-    ///         _ => {}
-    ///     }
-    /// }
-    /// ```
-    pub fn stream(&self, job_id: &str) -> EventSource {
-        let url = self.client.url(&format!("/v1/jobs/{}/stream", job_id));
-        let builder = self.client.http().get(&url);
-        EventSource::new(builder).expect("valid request builder")
-    }
-
-    /// Download the output file of a completed job as raw bytes.
-    pub async fn download(&self, job_id: &str) -> Result<bytes::Bytes, VynFiError> {
-        let resp = self
-            .client
-            .request_raw(Method::GET, &format!("/v1/jobs/{}/download", job_id))
-            .await?;
-        Ok(resp.bytes().await?)
     }
 }

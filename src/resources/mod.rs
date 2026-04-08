@@ -1,15 +1,11 @@
 mod api_keys;
-mod billing;
 mod catalog;
+mod credits;
 mod jobs;
-mod quality;
 mod usage;
-mod webhooks;
 
 pub use api_keys::ApiKeys;
-pub use billing::Billing;
 pub use catalog::Catalog;
-pub use jobs::{Jobs, ListJobsParams, SseEvent};
-pub use quality::Quality;
+pub use credits::Credits;
+pub use jobs::{Jobs, ListJobsParams};
 pub use usage::Usage;
-pub use webhooks::Webhooks;

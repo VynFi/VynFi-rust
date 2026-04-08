@@ -16,7 +16,7 @@ impl<'a> Usage<'a> {
 
     /// Get the current credit usage summary (balance, totals, burn rate).
     pub async fn summary(&self) -> Result<UsageSummary, VynFiError> {
-        self.client.request(Method::GET, "/v1/usage/summary").await
+        self.client.request(Method::GET, "/v1/usage").await
     }
 
     /// Get daily credit usage. Optionally specify the number of days to look

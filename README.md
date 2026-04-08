@@ -6,14 +6,14 @@ Official Rust client for the [VynFi](https://vynfi.com) synthetic financial data
 
 ```toml
 [dependencies]
-vynfi = "0.1"
+vynfi = "0.2"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 ```
 
 For the blocking client:
 ```toml
 [dependencies]
-vynfi = { version = "0.1", features = ["blocking"] }
+vynfi = { version = "0.2", features = ["blocking"] }
 ```
 
 ## Quick Start
@@ -26,9 +26,10 @@ async fn main() -> Result<(), vynfi::VynFiError> {
     let client = Client::builder("vf_live_...").build()?;
 
     // Generate synthetic data
-    let job = client.jobs().generate(&GenerateRequest::new(vec![
-        TableSpec { name: "transactions".into(), rows: 1000 },
-    ])).await?;
+    let job = client.jobs().generate(&GenerateRequest::new(
+        vec![TableSpec { name: "transactions".into(), rows: 1000 }],
+        "retail",
+    )).await?;
     println!("Job submitted: {}", job.id);
 
     // Browse catalog
@@ -39,7 +40,7 @@ async fn main() -> Result<(), vynfi::VynFiError> {
 
     // Check usage
     let usage = client.usage().summary().await?;
-    println!("Balance: {} credits", usage.balance);
+    println!("Balance: {} credits (tier: {})", usage.balance, usage.tier);
 
     Ok(())
 }
@@ -61,13 +62,11 @@ fn main() -> Result<(), vynfi::VynFiError> {
 
 | Resource | Methods |
 |----------|---------|
-| `client.jobs()` | `generate`, `generate_quick`, `list`, `get`, `cancel`, `stream`, `download` |
-| `client.catalog()` | `list_sectors`, `get_sector`, `list`, `get_fingerprint` |
+| `client.jobs()` | `generate`, `generate_quick`, `list`, `get`, `download` |
+| `client.catalog()` | `list_sectors`, `get_sector` |
 | `client.usage()` | `summary`, `daily` |
 | `client.api_keys()` | `create`, `list`, `get`, `update`, `revoke` |
-| `client.quality()` | `scores`, `timeline` |
-| `client.webhooks()` | `create`, `list`, `get`, `update`, `delete`, `test` |
-| `client.billing()` | `subscription`, `invoices`, `payment_method` |
+| `client.credits()` | `purchase`, `balance`, `history` |
 
 ## Error Handling
 
@@ -80,6 +79,7 @@ match client.jobs().get("bad-id").await {
     Ok(job) => println!("Got job: {}", job.id),
     Err(VynFiError::NotFound(_)) => println!("Job not found"),
     Err(VynFiError::RateLimit(_)) => println!("Rate limited, retry later"),
+    Err(VynFiError::Forbidden(_)) => println!("Forbidden"),
     Err(e) => eprintln!("Error: {e}"),
 }
 ```

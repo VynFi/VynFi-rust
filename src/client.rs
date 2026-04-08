@@ -5,7 +5,7 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::error::{ErrorBody, VynFiError};
-use crate::resources::{ApiKeys, Billing, Catalog, Jobs, Quality, Usage, Webhooks};
+use crate::resources::{ApiKeys, Catalog, Credits, Jobs, Usage};
 
 const DEFAULT_BASE_URL: &str = "https://api.vynfi.com";
 const DEFAULT_TIMEOUT_SECS: u64 = 30;
@@ -37,12 +37,12 @@ impl Client {
     // -- Resource accessors ---------------------------------------------------
     // Each returns a lightweight handle that borrows `&self`.
 
-    /// Jobs resource — submit, list, get, cancel, and download generation jobs.
+    /// Jobs resource — submit, list, get, and download generation jobs.
     pub fn jobs(&self) -> Jobs<'_> {
         Jobs::new(self)
     }
 
-    /// Catalog resource — list sectors, tables, and fingerprints.
+    /// Catalog resource — list sectors and tables.
     pub fn catalog(&self) -> Catalog<'_> {
         Catalog::new(self)
     }
@@ -57,19 +57,9 @@ impl Client {
         ApiKeys::new(self)
     }
 
-    /// Quality metrics resource.
-    pub fn quality(&self) -> Quality<'_> {
-        Quality::new(self)
-    }
-
-    /// Webhooks resource — CRUD and delivery history.
-    pub fn webhooks(&self) -> Webhooks<'_> {
-        Webhooks::new(self)
-    }
-
-    /// Billing resource — subscription, invoices, payment methods.
-    pub fn billing(&self) -> Billing<'_> {
-        Billing::new(self)
+    /// Credits resource — purchase packs and view prepaid balance.
+    pub fn credits(&self) -> Credits<'_> {
+        Credits::new(self)
     }
 
     // -- Internal request helpers (used by resource structs) ------------------
@@ -198,32 +188,6 @@ impl Client {
         Err(last_err.unwrap_or_else(|| VynFiError::Config("max retries exceeded".into())))
     }
 
-    /// Raw response (for binary downloads).
-    pub(crate) async fn request_raw(
-        &self,
-        method: reqwest::Method,
-        path: &str,
-    ) -> Result<Response, VynFiError> {
-        let url = format!("{}{}", self.base_url, path);
-        let resp = self.http.request(method, &url).send().await?;
-        if resp.status().is_client_error() || resp.status().is_server_error() {
-            return Err(Self::error_from_response(resp).await);
-        }
-        Ok(resp)
-    }
-
-    /// Build an absolute URL for the given path (used by resources to open SSE
-    /// streams via `reqwest-eventsource`).
-    pub(crate) fn url(&self, path: &str) -> String {
-        format!("{}{}", self.base_url, path)
-    }
-
-    /// Borrow the inner `reqwest::Client` (used by resources that need to
-    /// construct custom requests, e.g. SSE streaming).
-    pub(crate) fn http(&self) -> &reqwest::Client {
-        &self.http
-    }
-
     // -- Private helpers ------------------------------------------------------
 
     fn should_retry(status: StatusCode) -> bool {
@@ -240,14 +204,19 @@ impl Client {
     async fn error_from_response(resp: Response) -> VynFiError {
         let status = resp.status();
         let body: ErrorBody = resp.json().await.unwrap_or_else(|_| ErrorBody {
+            error_type: String::new(),
+            title: String::new(),
             detail: String::new(),
-            message: format!("HTTP {}", status.as_u16()),
             status: status.as_u16(),
+            request_id: String::new(),
+            fields: vec![],
         });
 
+        let body = Box::new(body);
         match status {
             StatusCode::UNAUTHORIZED => VynFiError::Authentication(body),
             StatusCode::PAYMENT_REQUIRED => VynFiError::InsufficientCredits(body),
+            StatusCode::FORBIDDEN => VynFiError::Forbidden(body),
             StatusCode::NOT_FOUND => VynFiError::NotFound(body),
             StatusCode::CONFLICT => VynFiError::Conflict(body),
             StatusCode::UNPROCESSABLE_ENTITY => VynFiError::Validation(body),
