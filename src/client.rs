@@ -5,7 +5,10 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::error::{ErrorBody, VynFiError};
-use crate::resources::{ApiKeys, Billing, Catalog, Jobs, Quality, Usage, Webhooks};
+use crate::resources::{
+    ApiKeys, Billing, Catalog, Configs, Credits, Jobs, Notifications, Quality, Scenarios, Sessions,
+    Usage, Webhooks,
+};
 
 const DEFAULT_BASE_URL: &str = "https://api.vynfi.com";
 const DEFAULT_TIMEOUT_SECS: u64 = 30;
@@ -70,6 +73,31 @@ impl Client {
     /// Billing resource — subscription, invoices, payment methods.
     pub fn billing(&self) -> Billing<'_> {
         Billing::new(self)
+    }
+
+    /// Configs resource — saved configs, validation, cost estimation.
+    pub fn configs(&self) -> Configs<'_> {
+        Configs::new(self)
+    }
+
+    /// Credits resource — prepaid credit packs and balances.
+    pub fn credits(&self) -> Credits<'_> {
+        Credits::new(self)
+    }
+
+    /// Sessions resource — multi-period generation sessions.
+    pub fn sessions(&self) -> Sessions<'_> {
+        Sessions::new(self)
+    }
+
+    /// Scenarios resource — what-if analysis scenarios.
+    pub fn scenarios(&self) -> Scenarios<'_> {
+        Scenarios::new(self)
+    }
+
+    /// Notifications resource — user notifications.
+    pub fn notifications(&self) -> Notifications<'_> {
+        Notifications::new(self)
     }
 
     // -- Internal request helpers (used by resource structs) ------------------

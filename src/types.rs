@@ -409,6 +409,357 @@ pub struct UpdateWebhookRequest {
 }
 
 // ---------------------------------------------------------------------------
+// Configs
+// ---------------------------------------------------------------------------
+
+/// A saved generation configuration.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedConfig {
+    pub id: String,
+    pub owner_id: String,
+    pub name: String,
+    pub description: String,
+    pub config: serde_json::Value,
+    pub source_template_id: Option<String>,
+    #[serde(default)]
+    pub version: i32,
+    pub visibility: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    pub last_used_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub schema_version: Option<i32>,
+}
+
+/// Request body for creating a saved config.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateConfigRequest {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub config: serde_json::Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_template_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub visibility: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<String>>,
+}
+
+/// Request body for updating a saved config.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateConfigRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub visibility: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<String>>,
+}
+
+/// Response from deleting a config.
+#[derive(Debug, Clone, Deserialize)]
+pub struct DeletedResponse {
+    pub deleted: bool,
+}
+
+/// Request body for validating a config.
+#[derive(Debug, Clone, Serialize)]
+pub struct ValidateConfigRequest {
+    pub config: serde_json::Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub partial: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub step: Option<String>,
+}
+
+/// A validation issue (error or warning).
+#[derive(Debug, Clone, Deserialize)]
+pub struct ValidationIssue {
+    pub field: String,
+    pub code: String,
+    pub message: String,
+    pub fix: Option<ValidationFix>,
+}
+
+/// A suggested fix for a validation issue.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ValidationFix {
+    pub field: String,
+    pub action: String,
+    pub value: serde_json::Value,
+}
+
+/// Response from config validation.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ValidateConfigResponse {
+    pub valid: bool,
+    pub errors: Vec<ValidationIssue>,
+    pub warnings: Vec<ValidationIssue>,
+}
+
+/// Request body for estimating config cost.
+#[derive(Debug, Clone, Serialize)]
+pub struct EstimateCostRequest {
+    pub config: serde_json::Value,
+}
+
+/// A credit multiplier entry in a cost estimate.
+#[derive(Debug, Clone, Deserialize)]
+pub struct MultiplierEntry {
+    pub source: String,
+    pub factor: f64,
+    pub label: String,
+}
+
+/// Balance information in a cost estimate.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BalanceInfo {
+    pub current: i64,
+    pub after_job: i64,
+    pub status: String,
+}
+
+/// Response from estimating config cost.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EstimateCostResponse {
+    pub base_credits: i64,
+    pub multipliers: Vec<MultiplierEntry>,
+    pub total_credits: i64,
+    pub capped_at: Option<f64>,
+    pub balance: BalanceInfo,
+}
+
+/// Request body for composing a config from layers.
+#[derive(Debug, Clone, Serialize)]
+pub struct ComposeConfigRequest {
+    pub layers: Vec<serde_json::Value>,
+}
+
+/// Response from composing a config.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ComposeConfigResponse {
+    pub config: serde_json::Value,
+    pub yaml: String,
+    pub layers: Vec<serde_json::Value>,
+}
+
+// ---------------------------------------------------------------------------
+// Credits
+// ---------------------------------------------------------------------------
+
+/// Request body for purchasing a prepaid credit pack.
+#[derive(Debug, Clone, Serialize)]
+pub struct PurchaseCreditsRequest {
+    pub pack: String,
+}
+
+/// Response from purchasing credits (Stripe checkout URL).
+#[derive(Debug, Clone, Deserialize)]
+pub struct PurchaseCreditsResponse {
+    pub checkout_url: String,
+}
+
+/// A prepaid credit batch.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrepaidBatch {
+    pub id: String,
+    pub owner_id: String,
+    pub pack: String,
+    pub credits_purchased: i64,
+    pub credits_remaining: i64,
+    pub credits_forfeited: i64,
+    pub status: String,
+    pub purchased_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
+}
+
+/// Prepaid credit balance with active batches.
+#[derive(Debug, Clone, Deserialize)]
+pub struct PrepaidBalanceResponse {
+    pub total_prepaid_credits: i64,
+    pub batches: Vec<PrepaidBatch>,
+}
+
+/// Prepaid credit history (includes expired batches).
+#[derive(Debug, Clone, Deserialize)]
+pub struct PrepaidHistoryResponse {
+    pub batches: Vec<PrepaidBatch>,
+}
+
+// ---------------------------------------------------------------------------
+// Sessions
+// ---------------------------------------------------------------------------
+
+/// Request body for creating a multi-period generation session.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateSessionRequest {
+    pub name: String,
+    pub fiscal_year_start: String,
+    pub period_length_months: i32,
+    pub periods: i32,
+    pub generation_config: serde_json::Value,
+}
+
+/// Request body for extending a session with additional periods.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExtendSessionRequest {
+    pub additional_periods: i32,
+}
+
+/// A multi-period generation session.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GenerationSession {
+    pub id: String,
+    pub name: String,
+    pub status: String,
+    pub fiscal_year_start: String,
+    pub period_length_months: i32,
+    pub periods_total: i32,
+    pub periods_generated: i32,
+    pub periods: serde_json::Value,
+    pub balance_snapshot: Option<serde_json::Value>,
+    pub generation_config: serde_json::Value,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Response from generating the next period of a session.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GenerateSessionResponse {
+    #[serde(flatten)]
+    pub session: GenerationSession,
+    pub job_id: String,
+    pub period_index: i32,
+    pub credits_reserved: i64,
+    pub period_start: String,
+    pub period_end: String,
+}
+
+// ---------------------------------------------------------------------------
+// Templates
+// ---------------------------------------------------------------------------
+
+/// A system template for generation configs.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Template {
+    pub id: String,
+    pub slug: String,
+    pub name: String,
+    pub description: String,
+    pub sector: String,
+    pub country: String,
+    pub framework: String,
+    pub config: serde_json::Value,
+    pub min_tier: String,
+    pub sort_order: i32,
+}
+
+// ---------------------------------------------------------------------------
+// Scenarios
+// ---------------------------------------------------------------------------
+
+/// Request body for creating a what-if scenario.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateScenarioRequest {
+    pub name: String,
+    pub template_id: String,
+    pub interventions: serde_json::Value,
+    pub generation_config: serde_json::Value,
+}
+
+/// A what-if scenario comparing baseline and counterfactual generation.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Scenario {
+    pub id: String,
+    pub name: String,
+    pub template_id: String,
+    pub status: String,
+    pub interventions: serde_json::Value,
+    pub generation_config: serde_json::Value,
+    pub baseline_job_id: Option<String>,
+    pub counterfactual_job_id: Option<String>,
+    pub diff: Option<serde_json::Value>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// A scenario template with graph structure.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScenarioTemplate {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub node_count: i32,
+    pub nodes: Vec<ScenarioTemplateNode>,
+    pub edges: Vec<ScenarioTemplateEdge>,
+    pub intervention_types: Vec<String>,
+}
+
+/// A node in a scenario template graph.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ScenarioTemplateNode {
+    pub id: String,
+    pub label: String,
+    pub x: i32,
+    pub y: i32,
+}
+
+/// An edge in a scenario template graph.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ScenarioTemplateEdge {
+    pub source: String,
+    pub target: String,
+}
+
+// ---------------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------------
+
+/// A user notification.
+#[derive(Debug, Clone, Deserialize)]
+pub struct Notification {
+    pub id: String,
+    pub user_id: String,
+    #[serde(rename = "type")]
+    pub notification_type: String,
+    pub title: String,
+    pub message: String,
+    pub link: Option<String>,
+    pub read: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+/// Request body for marking notifications as read.
+#[derive(Debug, Clone, Serialize)]
+pub struct MarkReadRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ids: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub all: Option<bool>,
+}
+
+// ---------------------------------------------------------------------------
 // Billing
 // ---------------------------------------------------------------------------
 

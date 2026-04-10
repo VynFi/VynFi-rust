@@ -31,7 +31,7 @@ Single-crate library (not a workspace). Entry point: `src/lib.rs`.
 - **`blocking.rs`** — Feature-gated (`blocking`). Wraps async client with a single-threaded Tokio runtime. SSE streaming is not available in blocking mode.
 
 **Resource modules (`src/resources/`):**
-Each resource is a lightweight borrowed-reference struct (`&'a Client`) exposing async methods. Seven resources: `jobs`, `catalog`, `usage`, `api_keys`, `quality`, `webhooks`, `billing`.
+Each resource is a lightweight borrowed-reference struct (`&'a Client`) exposing async methods. Twelve resources: `jobs`, `catalog`, `configs`, `credits`, `sessions`, `scenarios`, `usage`, `api_keys`, `quality`, `webhooks`, `billing`, `notifications`.
 
 **Key patterns:**
 - Resource structs borrow the client (`&'a Client`) — multiple resource handles can coexist

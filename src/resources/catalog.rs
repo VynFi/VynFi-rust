@@ -41,13 +41,10 @@ impl<'a> Catalog<'a> {
             params.push(("search", q.to_string()));
         }
 
-        let value: serde_json::Value = if params.is_empty() {
-            self.client.request(Method::GET, "/v1/catalog").await?
-        } else {
-            self.client
-                .request_with_params(Method::GET, "/v1/catalog", &params)
-                .await?
-        };
+        let value: serde_json::Value = self
+            .client
+            .request_with_params(Method::GET, "/v1/catalog", &params)
+            .await?;
         extract_list(value)
     }
 
@@ -60,5 +57,18 @@ impl<'a> Catalog<'a> {
         self.client
             .request(Method::GET, &format!("/v1/catalog/{}/{}", sector, profile))
             .await
+    }
+
+    /// List system templates, optionally filtered by sector.
+    pub async fn list_templates(&self, sector: Option<&str>) -> Result<Vec<Template>, VynFiError> {
+        let mut params: Vec<(&str, String)> = Vec::new();
+        if let Some(s) = sector {
+            params.push(("sector", s.to_string()));
+        }
+        let value: serde_json::Value = self
+            .client
+            .request_with_params(Method::GET, "/v1/templates", &params)
+            .await?;
+        extract_list(value)
     }
 }

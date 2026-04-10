@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.0] - 2026-04-10
+
+### Added
+
+- **Configs resource** (`client.configs()`) — save, list, get, update, and delete generation configs.
+  - `validate()` for pre-flight config validation with errors and warnings.
+  - `estimate_cost()` for credit cost estimation with multiplier breakdown.
+  - `compose()` for merging config layers.
+- **Credits resource** (`client.credits()`) — prepaid credit management.
+  - `purchase()` returns a Stripe checkout URL for credit pack purchase.
+  - `balance()` returns current prepaid balance with active batches.
+  - `history()` returns full batch history including expired batches.
+- **Sessions resource** (`client.sessions()`) — multi-period generation sessions.
+  - `create()`, `list()`, `extend()`, `generate_next()` for longitudinal data generation.
+- **Scenarios resource** (`client.scenarios()`) — what-if analysis.
+  - `create()`, `list()`, `run()`, `diff()` for baseline vs. counterfactual comparison.
+  - `templates()` lists available scenario graph templates.
+- **Notifications resource** (`client.notifications()`) — user notifications.
+  - `list()` with optional unread/limit filtering via `ListNotificationsParams`.
+  - `mark_read()` to mark notifications as read by IDs or all at once.
+- `catalog().list_templates()` — list system templates, optionally filtered by sector.
+- `ListConfigsParams` and `ListNotificationsParams` for paginated/filtered list operations.
+- New types: `SavedConfig`, `Template`, `GenerationSession`, `GenerateSessionResponse`, `Scenario`, `ScenarioTemplate`, `Notification`, `PrepaidBatch`, `PrepaidBalanceResponse`, `PrepaidHistoryResponse`, `ValidateConfigResponse`, `ValidationIssue`, `EstimateCostResponse`, `MultiplierEntry`, `BalanceInfo`, `ComposeConfigResponse`, `DeletedResponse`, and corresponding request types.
+
+### Changed
+
+- Bumped to 1.0.0 — SDK now covers the full stable VynFi API surface.
+
 ## [0.2.0] - 2026-04-08
 
 ### Added

@@ -1,15 +1,25 @@
 mod api_keys;
 mod billing;
 mod catalog;
+mod configs;
+mod credits;
 mod jobs;
+mod notifications;
 mod quality;
+mod scenarios;
+mod sessions;
 mod usage;
 mod webhooks;
 
 pub use api_keys::ApiKeys;
 pub use billing::Billing;
 pub use catalog::Catalog;
+pub use configs::{Configs, ListConfigsParams};
+pub use credits::Credits;
 pub use jobs::{Jobs, ListJobsParams};
+pub use notifications::{ListNotificationsParams, Notifications};
 pub use quality::Quality;
+pub use scenarios::Scenarios;
+pub use sessions::Sessions;
 pub use usage::Usage;
 pub use webhooks::Webhooks;

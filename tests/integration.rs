@@ -10,8 +10,10 @@
 //! ```
 
 use vynfi::{
-    Client, CreateApiKeyRequest, GenerateRequest, ListJobsParams, TableSpec, UpdateApiKeyRequest,
-    VynFiError,
+    Client, CreateApiKeyRequest, CreateConfigRequest, CreateScenarioRequest, CreateSessionRequest,
+    EstimateCostRequest, GenerateRequest, ListConfigsParams, ListJobsParams,
+    ListNotificationsParams, MarkReadRequest, TableSpec, UpdateApiKeyRequest, UpdateConfigRequest,
+    ValidateConfigRequest, VynFiError,
 };
 
 /// Build a client from environment variables.
@@ -49,8 +51,8 @@ async fn catalog_get_sector_retail() {
     assert!(!sector.tables.is_empty(), "retail should have tables");
     let names: Vec<&str> = sector.tables.iter().map(|t| t.name.as_str()).collect();
     assert!(
-        names.contains(&"journal_entries"),
-        "retail should include journal_entries, got: {names:?}"
+        names.contains(&"Journal Entries"),
+        "retail should include Journal Entries, got: {names:?}"
     );
 }
 
@@ -320,4 +322,272 @@ async fn billing_invoices() {
     for inv in &invoices {
         assert!(!inv.id.is_empty());
     }
+}
+
+// ===========================================================================
+// Templates
+// ===========================================================================
+
+#[tokio::test]
+#[ignore]
+async fn catalog_list_templates() {
+    let c = client();
+    let templates = c.catalog().list_templates(None).await.unwrap();
+    assert!(!templates.is_empty(), "expected at least one template");
+    for t in &templates {
+        assert!(!t.slug.is_empty());
+        assert!(!t.name.is_empty());
+        assert!(!t.sector.is_empty());
+    }
+}
+
+#[tokio::test]
+#[ignore]
+async fn catalog_list_templates_filtered() {
+    let c = client();
+    let templates = c.catalog().list_templates(Some("retail")).await.unwrap();
+    for t in &templates {
+        assert_eq!(t.sector, "retail", "expected only retail templates");
+    }
+}
+
+// ===========================================================================
+// Configs — CRUD lifecycle + validation + cost estimation
+// ===========================================================================
+
+#[tokio::test]
+#[ignore]
+async fn configs_lifecycle() {
+    let c = client();
+
+    // Create
+    let created = c
+        .configs()
+        .create(&CreateConfigRequest {
+            name: "integration-test-config".to_string(),
+            description: Some("Created by integration test".to_string()),
+            config: serde_json::json!({"rows": 100, "sector": "retail"}),
+            source_template_id: None,
+            visibility: Some("private".to_string()),
+            tags: Some(vec!["test".to_string()]),
+        })
+        .await
+        .unwrap();
+
+    assert!(!created.id.is_empty());
+    assert_eq!(created.name, "integration-test-config");
+    assert_eq!(created.visibility, "private");
+    let config_id = created.id.clone();
+
+    // List — new config should appear
+    let configs = c
+        .configs()
+        .list(&ListConfigsParams::default())
+        .await
+        .unwrap();
+    assert!(
+        configs.iter().any(|cfg| cfg.id == config_id),
+        "newly created config should appear in list"
+    );
+
+    // Get
+    let fetched = c.configs().get(&config_id).await.unwrap();
+    assert_eq!(fetched.id, config_id);
+    assert_eq!(fetched.name, "integration-test-config");
+
+    // Update
+    let updated = c
+        .configs()
+        .update(
+            &config_id,
+            &UpdateConfigRequest {
+                name: Some("integration-test-config-updated".to_string()),
+                description: None,
+                config: None,
+                visibility: None,
+                tags: None,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(updated.name, "integration-test-config-updated");
+
+    // Delete (cleanup)
+    let deleted = c.configs().delete(&config_id).await.unwrap();
+    assert!(deleted.deleted);
+}
+
+#[tokio::test]
+#[ignore]
+async fn configs_validate() {
+    let c = client();
+    let resp = c
+        .configs()
+        .validate(&ValidateConfigRequest {
+            config: serde_json::json!({"rows": 1000, "sector": "retail"}),
+            partial: None,
+            step: None,
+        })
+        .await
+        .unwrap();
+    // Whether valid or not, should get a structured response
+    assert!(resp.valid || !resp.errors.is_empty());
+}
+
+#[tokio::test]
+#[ignore]
+async fn configs_estimate_cost() {
+    let c = client();
+    let resp = c
+        .configs()
+        .estimate_cost(&EstimateCostRequest {
+            config: serde_json::json!({"rows": 1000, "sector": "retail"}),
+        })
+        .await
+        .unwrap();
+    assert!(resp.base_credits > 0);
+    assert!(resp.total_credits > 0);
+    assert!(!resp.balance.status.is_empty());
+}
+
+// ===========================================================================
+// Credits — read-only (purchase would create a Stripe session)
+// ===========================================================================
+
+#[tokio::test]
+#[ignore]
+async fn credits_balance() {
+    let c = client();
+    let resp = c.credits().balance().await.unwrap();
+    // total_prepaid_credits may be 0 if no packs purchased; just check it parses
+    assert!(resp.total_prepaid_credits >= 0);
+}
+
+#[tokio::test]
+#[ignore]
+async fn credits_history() {
+    let c = client();
+    let resp = c.credits().history().await.unwrap();
+    // History may be empty; just check it parses
+    for batch in &resp.batches {
+        assert!(!batch.id.is_empty());
+        assert!(!batch.pack.is_empty());
+    }
+}
+
+// ===========================================================================
+// Sessions — list + create
+// ===========================================================================
+
+#[tokio::test]
+#[ignore]
+async fn sessions_list() {
+    let c = client();
+    let sessions = c.sessions().list().await.unwrap();
+    for s in &sessions {
+        assert!(!s.id.is_empty());
+        assert!(!s.status.is_empty());
+    }
+}
+
+#[tokio::test]
+#[ignore]
+async fn sessions_create() {
+    let c = client();
+    let session = c
+        .sessions()
+        .create(&CreateSessionRequest {
+            name: "integration-test-session".to_string(),
+            fiscal_year_start: "2026-01-01".to_string(),
+            period_length_months: 3,
+            periods: 4,
+            generation_config: serde_json::json!({"rows": 100, "sector": "retail"}),
+        })
+        .await
+        .unwrap();
+
+    assert!(!session.id.is_empty());
+    assert_eq!(session.name, "integration-test-session");
+    assert_eq!(session.periods_total, 4);
+    assert_eq!(session.period_length_months, 3);
+    assert_eq!(session.periods_generated, 0);
+}
+
+// ===========================================================================
+// Scenarios — list + create
+// ===========================================================================
+
+#[tokio::test]
+#[ignore]
+async fn scenarios_list() {
+    let c = client();
+    let scenarios = c.scenarios().list().await.unwrap();
+    for s in &scenarios {
+        assert!(!s.id.is_empty());
+        assert!(!s.status.is_empty());
+    }
+}
+
+#[tokio::test]
+#[ignore]
+async fn scenarios_create() {
+    let c = client();
+    let scenario = c
+        .scenarios()
+        .create(&CreateScenarioRequest {
+            name: "integration-test-scenario".to_string(),
+            template_id: "supply-chain".to_string(),
+            interventions: serde_json::json!({"fraudRate": 0.05}),
+            generation_config: serde_json::json!({"rows": 100, "sector": "retail"}),
+        })
+        .await
+        .unwrap();
+
+    assert!(!scenario.id.is_empty());
+    assert_eq!(scenario.name, "integration-test-scenario");
+    assert_eq!(scenario.status, "created");
+}
+
+#[tokio::test]
+#[ignore]
+async fn scenarios_templates() {
+    let c = client();
+    let templates = c.scenarios().templates().await.unwrap();
+    for t in &templates {
+        assert!(!t.id.is_empty());
+        assert!(!t.name.is_empty());
+    }
+}
+
+// ===========================================================================
+// Notifications — list + mark read
+// ===========================================================================
+
+#[tokio::test]
+#[ignore]
+async fn notifications_list() {
+    let c = client();
+    let notifs = c
+        .notifications()
+        .list(&ListNotificationsParams::default())
+        .await
+        .unwrap();
+    for n in &notifs {
+        assert!(!n.id.is_empty());
+        assert!(!n.title.is_empty());
+    }
+}
+
+#[tokio::test]
+#[ignore]
+async fn notifications_mark_all_read() {
+    let c = client();
+    // Mark all as read — should succeed even if there are no notifications
+    c.notifications()
+        .mark_read(&MarkReadRequest {
+            ids: None,
+            all: Some(true),
+        })
+        .await
+        .unwrap();
 }

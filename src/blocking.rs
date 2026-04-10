@@ -71,6 +71,26 @@ impl Client {
         Billing { client: self }
     }
 
+    pub fn configs(&self) -> Configs<'_> {
+        Configs { client: self }
+    }
+
+    pub fn credits(&self) -> Credits<'_> {
+        Credits { client: self }
+    }
+
+    pub fn sessions(&self) -> Sessions<'_> {
+        Sessions { client: self }
+    }
+
+    pub fn scenarios(&self) -> Scenarios<'_> {
+        Scenarios { client: self }
+    }
+
+    pub fn notifications(&self) -> Notifications<'_> {
+        Notifications { client: self }
+    }
+
     fn block_on<F: std::future::Future>(&self, f: F) -> F::Output {
         self.rt.block_on(f)
     }
@@ -208,6 +228,11 @@ impl Catalog<'_> {
     pub fn get_fingerprint(&self, sector: &str, profile: &str) -> Result<Fingerprint, VynFiError> {
         self.client
             .block_on(self.client.inner.catalog().get_fingerprint(sector, profile))
+    }
+
+    pub fn list_templates(&self, sector: Option<&str>) -> Result<Vec<Template>, VynFiError> {
+        self.client
+            .block_on(self.client.inner.catalog().list_templates(sector))
     }
 }
 
@@ -356,5 +381,181 @@ impl Billing<'_> {
     pub fn payment_method(&self) -> Result<serde_json::Value, VynFiError> {
         self.client
             .block_on(self.client.inner.billing().payment_method())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Configs
+// ---------------------------------------------------------------------------
+
+pub struct Configs<'a> {
+    client: &'a Client,
+}
+
+impl Configs<'_> {
+    pub fn create(&self, req: &CreateConfigRequest) -> Result<SavedConfig, VynFiError> {
+        self.client
+            .block_on(self.client.inner.configs().create(req))
+    }
+
+    pub fn list(&self, params: &crate::ListConfigsParams) -> Result<Vec<SavedConfig>, VynFiError> {
+        self.client
+            .block_on(self.client.inner.configs().list(params))
+    }
+
+    pub fn get(&self, config_id: &str) -> Result<SavedConfig, VynFiError> {
+        self.client
+            .block_on(self.client.inner.configs().get(config_id))
+    }
+
+    pub fn update(
+        &self,
+        config_id: &str,
+        req: &UpdateConfigRequest,
+    ) -> Result<SavedConfig, VynFiError> {
+        self.client
+            .block_on(self.client.inner.configs().update(config_id, req))
+    }
+
+    pub fn delete(&self, config_id: &str) -> Result<DeletedResponse, VynFiError> {
+        self.client
+            .block_on(self.client.inner.configs().delete(config_id))
+    }
+
+    pub fn validate(
+        &self,
+        req: &ValidateConfigRequest,
+    ) -> Result<ValidateConfigResponse, VynFiError> {
+        self.client
+            .block_on(self.client.inner.configs().validate(req))
+    }
+
+    pub fn estimate_cost(
+        &self,
+        req: &EstimateCostRequest,
+    ) -> Result<EstimateCostResponse, VynFiError> {
+        self.client
+            .block_on(self.client.inner.configs().estimate_cost(req))
+    }
+
+    pub fn compose(&self, req: &ComposeConfigRequest) -> Result<ComposeConfigResponse, VynFiError> {
+        self.client
+            .block_on(self.client.inner.configs().compose(req))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Credits
+// ---------------------------------------------------------------------------
+
+pub struct Credits<'a> {
+    client: &'a Client,
+}
+
+impl Credits<'_> {
+    pub fn purchase(
+        &self,
+        req: &PurchaseCreditsRequest,
+    ) -> Result<PurchaseCreditsResponse, VynFiError> {
+        self.client
+            .block_on(self.client.inner.credits().purchase(req))
+    }
+
+    pub fn balance(&self) -> Result<PrepaidBalanceResponse, VynFiError> {
+        self.client.block_on(self.client.inner.credits().balance())
+    }
+
+    pub fn history(&self) -> Result<PrepaidHistoryResponse, VynFiError> {
+        self.client.block_on(self.client.inner.credits().history())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Sessions
+// ---------------------------------------------------------------------------
+
+pub struct Sessions<'a> {
+    client: &'a Client,
+}
+
+impl Sessions<'_> {
+    pub fn list(&self) -> Result<Vec<GenerationSession>, VynFiError> {
+        self.client.block_on(self.client.inner.sessions().list())
+    }
+
+    pub fn create(&self, req: &CreateSessionRequest) -> Result<GenerationSession, VynFiError> {
+        self.client
+            .block_on(self.client.inner.sessions().create(req))
+    }
+
+    pub fn extend(
+        &self,
+        session_id: &str,
+        req: &ExtendSessionRequest,
+    ) -> Result<GenerationSession, VynFiError> {
+        self.client
+            .block_on(self.client.inner.sessions().extend(session_id, req))
+    }
+
+    pub fn generate_next(&self, session_id: &str) -> Result<GenerateSessionResponse, VynFiError> {
+        self.client
+            .block_on(self.client.inner.sessions().generate_next(session_id))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Scenarios
+// ---------------------------------------------------------------------------
+
+pub struct Scenarios<'a> {
+    client: &'a Client,
+}
+
+impl Scenarios<'_> {
+    pub fn list(&self) -> Result<Vec<Scenario>, VynFiError> {
+        self.client.block_on(self.client.inner.scenarios().list())
+    }
+
+    pub fn create(&self, req: &CreateScenarioRequest) -> Result<Scenario, VynFiError> {
+        self.client
+            .block_on(self.client.inner.scenarios().create(req))
+    }
+
+    pub fn run(&self, scenario_id: &str) -> Result<Scenario, VynFiError> {
+        self.client
+            .block_on(self.client.inner.scenarios().run(scenario_id))
+    }
+
+    pub fn diff(&self, scenario_id: &str) -> Result<Scenario, VynFiError> {
+        self.client
+            .block_on(self.client.inner.scenarios().diff(scenario_id))
+    }
+
+    pub fn templates(&self) -> Result<Vec<ScenarioTemplate>, VynFiError> {
+        self.client
+            .block_on(self.client.inner.scenarios().templates())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------------
+
+pub struct Notifications<'a> {
+    client: &'a Client,
+}
+
+impl Notifications<'_> {
+    pub fn list(
+        &self,
+        params: &crate::ListNotificationsParams,
+    ) -> Result<Vec<Notification>, VynFiError> {
+        self.client
+            .block_on(self.client.inner.notifications().list(params))
+    }
+
+    pub fn mark_read(&self, req: &MarkReadRequest) -> Result<(), VynFiError> {
+        self.client
+            .block_on(self.client.inner.notifications().mark_read(req))
     }
 }
