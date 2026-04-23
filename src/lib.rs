@@ -12,6 +12,7 @@
 //! }
 //! ```
 
+mod archive;
 mod client;
 mod error;
 mod resources;
@@ -20,10 +21,12 @@ mod types;
 #[cfg(feature = "blocking")]
 pub mod blocking;
 
+pub use archive::JobArchive;
 pub use client::{Client, ClientBuilder};
 pub use error::{ErrorBody, VynFiError};
 pub use resources::{
-    ApiKeys, Billing, Catalog, Configs, Credits, Jobs, ListConfigsParams, ListJobsParams,
-    ListNotificationsParams, Notifications, Quality, Scenarios, Sessions, Usage, Webhooks,
+    Adversarial, Ai, ApiKeys, Billing, Catalog, Configs, Credits, Fingerprint, Jobs,
+    ListConfigsParams, ListJobsParams, ListNotificationsParams, NdjsonStreamParams,
+    Notifications, Optimizer, Quality, Scenarios, Sessions, TemplatePacks, Usage, Webhooks,
 };
 pub use types::*;

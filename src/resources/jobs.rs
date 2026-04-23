@@ -133,10 +133,186 @@ impl<'a> Jobs<'a> {
             .client
             .request_raw(
                 Method::GET,
-                &format!("/v1/jobs/{}/download", job_id),
-                &[("file", file.to_string())],
+                &format!("/v1/jobs/{}/download/{}", job_id, file),
+                &[],
             )
             .await?;
         Ok(resp.bytes().await?)
     }
+
+    /// Download the job's full archive as raw bytes and construct a
+    /// [`JobArchive`](crate::JobArchive) for ergonomic file access.
+    pub async fn download_archive(&self, job_id: &str) -> Result<crate::JobArchive, VynFiError> {
+        let data = self.download(job_id).await?;
+        crate::JobArchive::from_bytes(&data).map_err(VynFiError::Config)
+    }
+
+    /// Download the job's full archive and write the bytes to a local file.
+    pub async fn download_to(
+        &self,
+        job_id: &str,
+        path: impl AsRef<std::path::Path>,
+    ) -> Result<std::path::PathBuf, VynFiError> {
+        let bytes = self.download(job_id).await?;
+        let p = path.as_ref().to_path_buf();
+        std::fs::write(&p, &bytes).map_err(|e| VynFiError::Config(e.to_string()))?;
+        Ok(p)
+    }
+
+    /// List every file in a completed job's archive with size + schema
+    /// metadata. Retries on 404 up to ~4.5s to absorb managed_blob index lag.
+    pub async fn list_files(&self, job_id: &str) -> Result<JobFileList, VynFiError> {
+        let path = format!("/v1/jobs/{}/files", job_id);
+        let mut last_err: Option<VynFiError> = None;
+        for delay_ms in &[0u64, 1_500, 3_000] {
+            if *delay_ms > 0 {
+                tokio::time::sleep(std::time::Duration::from_millis(*delay_ms)).await;
+            }
+            match self.client.request::<JobFileList>(Method::GET, &path).await {
+                Ok(fl) => return Ok(fl),
+                Err(e @ VynFiError::NotFound(_)) => last_err = Some(e),
+                Err(e) => return Err(e),
+            }
+        }
+        Err(last_err.unwrap_or_else(|| VynFiError::Config("list_files failed".into())))
+    }
+
+    /// Get pre-built analytics for a completed job (DS 2.3+).
+    pub async fn analytics(&self, job_id: &str) -> Result<JobAnalytics, VynFiError> {
+        self.client
+            .request(Method::GET, &format!("/v1/jobs/{}/analytics", job_id))
+            .await
+    }
+
+    /// Get the scheme-vs-direct fraud origin split (DS 3.1.1+).
+    pub async fn fraud_split(&self, job_id: &str) -> Result<FraudSplit, VynFiError> {
+        self.client
+            .request(Method::GET, &format!("/v1/jobs/{}/fraud-split", job_id))
+            .await
+    }
+
+    /// Get aggregated audit + anomaly artifacts (VynFi API 4.1+).
+    pub async fn audit_artifacts(&self, job_id: &str) -> Result<AuditArtifacts, VynFiError> {
+        self.client
+            .request(Method::GET, &format!("/v1/jobs/{}/audit-artifacts", job_id))
+            .await
+    }
+
+    /// Request an AI-suggested config tune based on the job's quality scores
+    /// (DS 3.0+, Scale+).
+    pub async fn tune(
+        &self,
+        job_id: &str,
+        req: &AiTuneRequest,
+    ) -> Result<AiTuneResponse, VynFiError> {
+        self.client
+            .request_with_body(Method::POST, &format!("/v1/jobs/{}/tune", job_id), Some(req))
+            .await
+    }
+
+    /// Poll until the job reaches a terminal state. Returns the last-seen job
+    /// if the timeout is exhausted.
+    pub async fn wait(
+        &self,
+        job_id: &str,
+        poll_interval: std::time::Duration,
+        timeout: std::time::Duration,
+    ) -> Result<Job, VynFiError> {
+        let start = std::time::Instant::now();
+        loop {
+            let job = self.get(job_id).await?;
+            if matches!(job.status.as_str(), "completed" | "failed" | "cancelled") {
+                return Ok(job);
+            }
+            if start.elapsed() >= timeout {
+                return Ok(job);
+            }
+            tokio::time::sleep(poll_interval).await;
+        }
+    }
+
+    /// Poll until every job in `job_ids` reaches a terminal state.
+    pub async fn wait_for_many(
+        &self,
+        job_ids: &[String],
+        poll_interval: std::time::Duration,
+        timeout: std::time::Duration,
+    ) -> Result<Vec<Job>, VynFiError> {
+        let start = std::time::Instant::now();
+        let mut results: std::collections::HashMap<String, Job> = std::collections::HashMap::new();
+        let mut pending: Vec<String> = job_ids.to_vec();
+        let terminal = ["completed", "failed", "cancelled"];
+        while !pending.is_empty() && start.elapsed() < timeout {
+            let mut still_pending = Vec::new();
+            for jid in pending.drain(..) {
+                match self.get(&jid).await {
+                    Ok(job) => {
+                        let done = terminal.contains(&job.status.as_str());
+                        results.insert(jid.clone(), job);
+                        if !done {
+                            still_pending.push(jid);
+                        }
+                    }
+                    Err(_) => still_pending.push(jid),
+                }
+            }
+            pending = still_pending;
+            if !pending.is_empty() {
+                tokio::time::sleep(poll_interval).await;
+            }
+        }
+        // Best-effort capture for any still-pending ids on the way out.
+        for jid in &pending {
+            if !results.contains_key(jid) {
+                if let Ok(job) = self.get(jid).await {
+                    results.insert(jid.clone(), job);
+                }
+            }
+        }
+        Ok(job_ids
+            .iter()
+            .filter_map(|j| results.remove(j))
+            .collect())
+    }
+
+    /// Stream NDJSON output records from a job (DS 2.3+, Scale+).
+    ///
+    /// Returns the raw streaming [`reqwest::Response`]; drain it with
+    /// `response.bytes_stream()` and split on `\n` to get one record per line.
+    /// Progress envelopes arrive as JSON objects with `"type": "_progress"`.
+    pub async fn stream_ndjson(
+        &self,
+        job_id: &str,
+        params: &NdjsonStreamParams,
+    ) -> Result<reqwest::Response, VynFiError> {
+        let mut query: Vec<(&str, String)> = Vec::new();
+        if let Some(r) = params.rate {
+            query.push(("rate", r.to_string()));
+        }
+        if let Some(b) = params.burst {
+            query.push(("burst", b.to_string()));
+        }
+        if let Some(p) = params.progress_interval {
+            query.push(("progress_interval", p.to_string()));
+        }
+        if let Some(ref f) = params.file {
+            query.push(("file", f.clone()));
+        }
+        self.client
+            .request_raw(
+                Method::GET,
+                &format!("/v1/jobs/{}/stream/ndjson", job_id),
+                &query,
+            )
+            .await
+    }
+}
+
+/// Parameters for NDJSON output streaming.
+#[derive(Debug, Default, Clone)]
+pub struct NdjsonStreamParams {
+    pub rate: Option<u32>,
+    pub burst: Option<u32>,
+    pub progress_interval: Option<u32>,
+    pub file: Option<String>,
 }

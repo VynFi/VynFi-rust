@@ -1456,3 +1456,72 @@ pub struct FingerprintSynthesisResponse {
     #[serde(default)]
     pub status: String,
 }
+
+// ---------------------------------------------------------------------------
+// Extra Configs types for v1.8.0 (estimate-size, raw, NL config helpers)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct SizeBucket {
+    #[serde(default)]
+    pub domain: String,
+    #[serde(default)]
+    pub bytes: i64,
+    #[serde(default)]
+    pub files: i64,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct EstimateSizeResponse {
+    #[serde(default)]
+    pub total_bytes: i64,
+    #[serde(default)]
+    pub file_count: i64,
+    #[serde(default)]
+    pub tier_quota_bytes: i64,
+    #[serde(default)]
+    pub exceeds_quota: bool,
+    #[serde(default)]
+    pub by_domain: Vec<SizeBucket>,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct EstimateSizeRequest {
+    pub config: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct RawConfigRequest {
+    pub yaml: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct RawConfigResponse {
+    #[serde(default)]
+    pub valid: bool,
+    pub config_id: Option<String>,
+    #[serde(default)]
+    pub issues: Vec<serde_json::Value>,
+    pub cost_estimate: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct NlDescriptionRequest {
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct NlCompanyRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uid: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub periods: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fraud_rate: Option<f64>,
+}

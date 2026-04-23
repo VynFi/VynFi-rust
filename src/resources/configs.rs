@@ -106,4 +106,51 @@ impl<'a> Configs<'a> {
             .request_with_body(Method::POST, "/v1/config/compose", Some(req))
             .await
     }
+
+    /// Estimate the total archive size of a generation config (DS 3.0+).
+    pub async fn estimate_size(
+        &self,
+        req: &EstimateSizeRequest,
+    ) -> Result<EstimateSizeResponse, VynFiError> {
+        self.client
+            .request_with_body(Method::POST, "/v1/configs/estimate-size", Some(req))
+            .await
+    }
+
+    /// Submit a raw DataSynth YAML config for validation (Scale+).
+    pub async fn submit_raw(&self, req: &RawConfigRequest) -> Result<RawConfigResponse, VynFiError> {
+        self.client
+            .request_with_body(Method::POST, "/v1/configs/raw", Some(req))
+            .await
+    }
+
+    /// Build a config from a natural-language description (Scale+).
+    pub async fn from_description(
+        &self,
+        description: impl Into<String>,
+    ) -> Result<NlConfigResponse, VynFiError> {
+        let req = NlDescriptionRequest {
+            description: description.into(),
+        };
+        self.client
+            .request_with_body(Method::POST, "/v1/configs/from-description", Some(&req))
+            .await
+    }
+
+    /// Build a config from a Swiss VynCo company profile (Scale+).
+    ///
+    /// Supply either `uid` or `name` on the request.
+    pub async fn from_company(
+        &self,
+        req: &NlCompanyRequest,
+    ) -> Result<CompanyConfigResponse, VynFiError> {
+        if req.uid.is_none() && req.name.is_none() {
+            return Err(VynFiError::Config(
+                "from_company() requires either uid or name".into(),
+            ));
+        }
+        self.client
+            .request_with_body(Method::POST, "/v1/configs/from-company", Some(req))
+            .await
+    }
 }

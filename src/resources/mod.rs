@@ -24,7 +24,7 @@ pub use catalog::Catalog;
 pub use configs::{Configs, ListConfigsParams};
 pub use credits::Credits;
 pub use fingerprint::Fingerprint;
-pub use jobs::{Jobs, ListJobsParams};
+pub use jobs::{Jobs, ListJobsParams, NdjsonStreamParams};
 pub use notifications::{ListNotificationsParams, Notifications};
 pub use optimizer::Optimizer;
 pub use quality::Quality;

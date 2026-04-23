@@ -2,6 +2,62 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.0] - 2026-04-23
+
+Bulk catch-up to the Python SDK master (v1.8.0). Every resource, helper,
+and type the Python SDK exposes is now on the Rust side.
+
+### Added — new resources
+
+- **`Adversarial`** (`client.adversarial()`, Enterprise) — `probe()` / `results()`.
+- **`Ai`** (`client.ai()`, Scale+) — `chat()` co-pilot.
+- **`Fingerprint`** (`client.fingerprint()`, Team+) — `synthesize()`.
+- **`Optimizer`** (`client.optimizer()`, Scale+) — six `POST /v1/optimizer/*` wrappers.
+- **`TemplatePacks`** (`client.template_packs()`, Team+) — full CRUD + validate + enrich + categories.
+
+### Added — Jobs gap-filling
+
+- `analytics()`, `fraud_split()`, `audit_artifacts()`, `list_files()` (404-retry),
+  `download_archive()` → `JobArchive`, `download_to(path)`, `stream_ndjson()`,
+  `tune()`, `wait()`, `wait_for_many()`
+
+### Added — Configs gap-filling
+
+- `from_description(text)` (Scale+), `from_company(req)` (Scale+),
+  `estimate_size(config)`, `submit_raw(yaml)` (Scale+)
+
+### Added — `JobArchive`
+
+Zip + managed_blob backends, transparent lazy-fetch. Matches the Python
+`JobArchive` API: files, find, categories, read, text, json, size, url,
+extract_to, audit_opinions, key_audit_matters, sap_tables, sap_table,
+saft_file (root + legacy nested), coa_meta.
+
+### Added — types
+
+~650 lines in `types.rs`: analytics (BenfordAnalysis, AmountDistribution,
+VariantAnalysis, KycCompleteness, AmlDetectability, BankingEvaluation,
+JobAnalytics), audit (AuditOpinion, KeyAuditMatter, AuditArtifacts),
+fraud-split, file listing, optimizer request+response set, template
+packs set, NL config responses, AI types, fingerprint response, plus
+SAP/SAF-T: `SapExportConfig`, `SaftExportConfig`, `ChartOfAccountsMeta`,
+`SAP_DEFAULT_TABLES` (8) and `SAP_ALL_TABLES` (28).
+
+### Added — examples
+
+- `examples/sap_export.rs` — generate → download → BKPF↔BSEG FK check
+- `examples/saft_export.rs` — PT SAF-T fetch with company metadata
+
+### Changed
+
+- `download_file` endpoint switched from `?file=` query to
+  `/v1/jobs/{id}/download/{file}` path-suffix.
+
+### Dependencies
+
+- New: `zip = "2"` (deflate-only). `reqwest` gains the `blocking` feature
+  for lazy `JobArchive` fetches.
+
 ## [1.0.0] - 2026-04-10
 
 ### Added
