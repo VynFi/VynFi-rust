@@ -805,3 +805,654 @@ pub struct Invoice {
     pub hosted_invoice_url: Option<String>,
     pub pdf: Option<String>,
 }
+
+// ---------------------------------------------------------------------------
+// Analytics (DataSynth 2.3+, v1.8.0)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct BenfordAnalysis {
+    #[serde(default)]
+    pub sample_size: i64,
+    #[serde(default)]
+    pub observed_frequencies: Vec<f64>,
+    #[serde(default)]
+    pub observed_counts: Vec<i64>,
+    #[serde(default)]
+    pub expected_frequencies: Vec<f64>,
+    #[serde(default)]
+    pub chi_squared: f64,
+    #[serde(default)]
+    pub degrees_of_freedom: i64,
+    #[serde(default)]
+    pub p_value: f64,
+    #[serde(default)]
+    pub mad: f64,
+    #[serde(default)]
+    pub conformity: String,
+    #[serde(default)]
+    pub passes: bool,
+    #[serde(default)]
+    pub anti_benford_score: f64,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct AmountDistributionAnalysis {
+    #[serde(default)]
+    pub sample_size: i64,
+    #[serde(default)]
+    pub mean: String,
+    #[serde(default)]
+    pub median: String,
+    #[serde(default)]
+    pub std_dev: String,
+    #[serde(default)]
+    pub min: String,
+    #[serde(default)]
+    pub max: String,
+    #[serde(default)]
+    pub percentile_1: String,
+    #[serde(default)]
+    pub percentile_99: String,
+    #[serde(default)]
+    pub skewness: f64,
+    #[serde(default)]
+    pub kurtosis: f64,
+    #[serde(default)]
+    pub round_number_ratio: f64,
+    #[serde(default)]
+    pub nice_number_ratio: f64,
+    #[serde(default)]
+    pub passes: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct VariantAnalysis {
+    #[serde(default)]
+    pub variant_count: i64,
+    #[serde(default)]
+    pub total_cases: i64,
+    #[serde(default)]
+    pub variant_entropy: f64,
+    #[serde(default)]
+    pub happy_path_concentration: f64,
+    #[serde(default)]
+    pub passes: bool,
+    #[serde(default)]
+    pub issues: Vec<String>,
+    #[serde(default)]
+    pub rework_rate: f64,
+    #[serde(default)]
+    pub skipped_step_rate: f64,
+    #[serde(default)]
+    pub out_of_order_rate: f64,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct TypologyDetection {
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub transaction_count: i64,
+    #[serde(default)]
+    pub case_count: i64,
+    #[serde(default)]
+    pub flag_rate: f64,
+    #[serde(default)]
+    pub pattern_detected: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct KycCompletenessAnalysis {
+    #[serde(default)]
+    pub core_field_rate: f64,
+    #[serde(default)]
+    pub name_rate: f64,
+    #[serde(default)]
+    pub dob_rate: f64,
+    #[serde(default)]
+    pub address_rate: f64,
+    #[serde(default)]
+    pub id_document_rate: f64,
+    #[serde(default)]
+    pub risk_rating_rate: f64,
+    #[serde(default)]
+    pub total_profiles: i64,
+    #[serde(default)]
+    pub passes: bool,
+    #[serde(default)]
+    pub issues: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct AmlDetectabilityAnalysis {
+    #[serde(default)]
+    pub typology_coverage: f64,
+    #[serde(default)]
+    pub scenario_coherence: f64,
+    #[serde(default)]
+    pub per_typology: Vec<TypologyDetection>,
+    #[serde(default)]
+    pub total_transactions: i64,
+    #[serde(default)]
+    pub passes: bool,
+    #[serde(default)]
+    pub issues: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct BankingEvaluation {
+    pub kyc: Option<KycCompletenessAnalysis>,
+    pub aml: Option<AmlDetectabilityAnalysis>,
+    #[serde(default)]
+    pub passes: bool,
+    #[serde(default)]
+    pub issues: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct JobAnalytics {
+    pub benford_analysis: Option<BenfordAnalysis>,
+    pub amount_distribution: Option<AmountDistributionAnalysis>,
+    pub process_variant_summary: Option<VariantAnalysis>,
+    pub banking_evaluation: Option<BankingEvaluation>,
+}
+
+// ---------------------------------------------------------------------------
+// Audit (DS 3.1.0+)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct AuditOpinion {
+    #[serde(default)]
+    pub opinion_id: String,
+    #[serde(default)]
+    pub company_code: String,
+    pub fiscal_year: Option<i32>,
+    #[serde(default)]
+    pub opinion_type: String,
+    #[serde(default)]
+    pub going_concern: String,
+    #[serde(default)]
+    pub basis_for_opinion: String,
+    #[serde(default)]
+    pub signed_by: String,
+    #[serde(default)]
+    pub signed_date: String,
+    #[serde(default)]
+    pub matters: Vec<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct KeyAuditMatter {
+    #[serde(default)]
+    pub matter_id: String,
+    #[serde(default)]
+    pub company_code: String,
+    pub fiscal_year: Option<i32>,
+    #[serde(default)]
+    pub title: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub audit_response: String,
+    #[serde(default)]
+    pub related_accounts: Vec<String>,
+    #[serde(default)]
+    pub risk_level: String,
+}
+
+// ---------------------------------------------------------------------------
+// Fraud split (DS 3.1.1+)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct FraudTypeSplit {
+    #[serde(default)]
+    pub total: i64,
+    #[serde(default)]
+    pub scheme_propagated: i64,
+    #[serde(default)]
+    pub direct_injection: i64,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct FraudSplit {
+    #[serde(default)]
+    pub total_entries: i64,
+    #[serde(default)]
+    pub fraud_entries: i64,
+    #[serde(default)]
+    pub scheme_propagated: i64,
+    #[serde(default)]
+    pub direct_injection: i64,
+    #[serde(default)]
+    pub propagation_rate: f64,
+    #[serde(default)]
+    pub by_fraud_type: std::collections::HashMap<String, FraudTypeSplit>,
+}
+
+// ---------------------------------------------------------------------------
+// Audit artifacts (API 4.1+)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct AuditArtifacts {
+    pub audit_opinions: Option<serde_json::Value>,
+    pub key_audit_matters: Option<serde_json::Value>,
+    pub anomaly_labels: Option<serde_json::Value>,
+}
+
+// ---------------------------------------------------------------------------
+// File listing
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct FileSchema {
+    #[serde(default)]
+    pub name: String,
+    #[serde(rename = "type", default)]
+    pub type_: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct JobFile {
+    pub path: String,
+    #[serde(default)]
+    pub size_bytes: i64,
+    #[serde(default)]
+    pub content_type: String,
+    #[serde(default, rename = "schema")]
+    pub schema_: Vec<FileSchema>,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct JobFileList {
+    #[serde(default)]
+    pub job_id: String,
+    #[serde(default)]
+    pub total_files: i64,
+    #[serde(default)]
+    pub total_size_bytes: i64,
+    #[serde(default)]
+    pub files: Vec<JobFile>,
+}
+
+// ---------------------------------------------------------------------------
+// Optimizer (VynFi API 4.1+, DS 4.1.2+)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct OptimizerResponse {
+    pub report: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct RiskScopeRequest {
+    pub engagement: serde_json::Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_n: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct PortfolioRequest {
+    pub candidates: serde_json::Value,
+    pub budget_hours: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourcesRequest {
+    pub schedule: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ConformanceRequest {
+    pub trace: serde_json::Value,
+    pub blueprint: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct MonteCarloRequest {
+    pub engagement: serde_json::Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub runs: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seed: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CalibrationRequest {
+    pub findings: serde_json::Value,
+}
+
+// ---------------------------------------------------------------------------
+// Template packs (VynFi API 4.1+, DS 3.2+, Team+)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TemplatePackCategorySummary {
+    pub category: String,
+    #[serde(default)]
+    pub size_bytes: i64,
+    pub updated_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TemplatePack {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    #[serde(default = "default_merge_strategy")]
+    pub merge_strategy: String,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub categories: Vec<TemplatePackCategorySummary>,
+}
+
+fn default_merge_strategy() -> String {
+    "extend".into()
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TemplatePackList {
+    #[serde(default)]
+    pub packs: Vec<TemplatePack>,
+    #[serde(default)]
+    pub limit: i64,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct TemplatePackValidationIssue {
+    #[serde(default)]
+    pub category: String,
+    #[serde(default)]
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TemplatePackValidation {
+    #[serde(default = "default_true")]
+    pub valid: bool,
+    #[serde(default)]
+    pub categories_checked: Vec<String>,
+    #[serde(default)]
+    pub issues: Vec<TemplatePackValidationIssue>,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TemplatePackCategoryContent {
+    pub category: String,
+    #[serde(default)]
+    pub content_yaml: String,
+    #[serde(default)]
+    pub size_bytes: i64,
+    pub updated_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TemplatePackEnrichResponse {
+    pub category: String,
+    pub target_pack_category: String,
+    #[serde(default)]
+    pub count_requested: u32,
+    #[serde(default)]
+    pub size_bytes_after: i32,
+    #[serde(default)]
+    pub model: String,
+    #[serde(default)]
+    pub seed: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CreatePackRequest {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub merge_strategy: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdatePackRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub merge_strategy: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct EnrichCategoryRequest {
+    pub category: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub industry: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sub_category: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub count: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seed: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_pack_category: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// NL config (VynFi API 4.1+)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct NlConfigResponse {
+    pub config: Option<serde_json::Value>,
+    #[serde(default)]
+    pub yaml: String,
+    #[serde(default)]
+    pub confidence: f64,
+    #[serde(default)]
+    pub notes: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CompanyConfigResponse {
+    pub company: Option<serde_json::Value>,
+    pub config: Option<serde_json::Value>,
+    #[serde(default)]
+    pub yaml: String,
+    #[serde(default)]
+    pub notes: String,
+}
+
+// ---------------------------------------------------------------------------
+// SAP / SAF-T export (VynFi API 4.4+, DS 4.3+)
+// ---------------------------------------------------------------------------
+
+/// Default 8-table SAP set emitted when `exportFormat == "sap"` without an
+/// explicit `tables` list.
+pub const SAP_DEFAULT_TABLES: &[&str] = &[
+    "bkpf", "bseg", "acdoca", "lfa1", "kna1", "mara", "csks", "cepc",
+];
+
+/// Full SAP superset (DS 4.3+) — master data, transactional, open/cleared
+/// items for GL/AR/AP.
+pub const SAP_ALL_TABLES: &[&str] = &[
+    "bkpf", "bseg", "acdoca",
+    "lfa1", "lfb1", "kna1", "knb1", "mara", "mard", "anla", "csks", "cepc",
+    "ska1", "skb1",
+    "ekko", "ekpo", "vbak", "vbap", "likp", "lips", "mkpf", "mseg",
+    "bsis", "bsas", "bsid", "bsad", "bsik", "bsak",
+];
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SapExportConfig {
+    #[serde(default = "default_sap_dialect")]
+    pub dialect: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tables: Vec<String>,
+    #[serde(default = "default_sap_client")]
+    pub client: String,
+    #[serde(default = "default_sap_ledger")]
+    pub ledger: String,
+    #[serde(default = "default_sap_source_system")]
+    pub source_system: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub local_currency: Option<String>,
+    #[serde(default = "default_true")]
+    pub include_extension_fields: bool,
+}
+
+fn default_sap_dialect() -> String { "hana".into() }
+fn default_sap_client() -> String { "200".into() }
+fn default_sap_ledger() -> String { "0L".into() }
+fn default_sap_source_system() -> String { "DATASYNTH".into() }
+
+impl Default for SapExportConfig {
+    fn default() -> Self {
+        Self {
+            dialect: default_sap_dialect(),
+            tables: Vec::new(),
+            client: default_sap_client(),
+            ledger: default_sap_ledger(),
+            source_system: default_sap_source_system(),
+            local_currency: None,
+            include_extension_fields: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaftExportConfig {
+    pub jurisdiction: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub company_tax_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub company_name: Option<String>,
+}
+
+impl SaftExportConfig {
+    pub fn new(jurisdiction: impl Into<String>) -> Self {
+        Self {
+            jurisdiction: jurisdiction.into(),
+            company_tax_id: None,
+            company_name: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct ChartOfAccountsMeta {
+    pub coa_id: Option<String>,
+    pub accounting_framework: Option<String>,
+    pub country: Option<String>,
+    pub industry: Option<String>,
+    pub complexity: Option<String>,
+    pub account_count: Option<i64>,
+    #[serde(flatten)]
+    pub extra: std::collections::HashMap<String, serde_json::Value>,
+}
+
+// ---------------------------------------------------------------------------
+// Adversarial (DS 3.0+, Enterprise)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct AdversarialProbeResponse {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct ProbeSample {
+    #[serde(default)]
+    pub id: String,
+    pub prediction: Option<serde_json::Value>,
+    pub ground_truth: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct AdversarialProbeResults {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub samples: Vec<ProbeSample>,
+    pub metrics: Option<serde_json::Value>,
+}
+
+// ---------------------------------------------------------------------------
+// AI (DS 3.0+, Scale+)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AiTuneResponse {
+    pub original_config: Option<serde_json::Value>,
+    pub suggested_config: Option<serde_json::Value>,
+    #[serde(default)]
+    pub explanation: String,
+    pub quality_summary: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct AiChatResponse {
+    #[serde(default)]
+    pub reply: String,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct AiChatRequest {
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub page: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AiTuneRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_scores: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_iterations: Option<u32>,
+}
+
+// ---------------------------------------------------------------------------
+// Fingerprint (DS 3.0+, Team+)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct FingerprintSynthesisResponse {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub status: String,
+}

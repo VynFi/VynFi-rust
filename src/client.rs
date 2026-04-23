@@ -6,8 +6,8 @@ use serde_json::Value;
 
 use crate::error::{ErrorBody, VynFiError};
 use crate::resources::{
-    ApiKeys, Billing, Catalog, Configs, Credits, Jobs, Notifications, Quality, Scenarios, Sessions,
-    Usage, Webhooks,
+    Adversarial, Ai, ApiKeys, Billing, Catalog, Configs, Credits, Fingerprint, Jobs,
+    Notifications, Optimizer, Quality, Scenarios, Sessions, TemplatePacks, Usage, Webhooks,
 };
 
 const DEFAULT_BASE_URL: &str = "https://api.vynfi.com";
@@ -98,6 +98,31 @@ impl Client {
     /// Notifications resource — user notifications.
     pub fn notifications(&self) -> Notifications<'_> {
         Notifications::new(self)
+    }
+
+    /// Adversarial probing resource (Enterprise tier).
+    pub fn adversarial(&self) -> Adversarial<'_> {
+        Adversarial::new(self)
+    }
+
+    /// AI co-pilot resource (Scale+ tier).
+    pub fn ai(&self) -> Ai<'_> {
+        Ai::new(self)
+    }
+
+    /// Fingerprint synthesis resource (DS 3.0+, Team+).
+    pub fn fingerprint(&self) -> Fingerprint<'_> {
+        Fingerprint::new(self)
+    }
+
+    /// Audit optimizer resource (VynFi API 4.1+, Scale+).
+    pub fn optimizer(&self) -> Optimizer<'_> {
+        Optimizer::new(self)
+    }
+
+    /// Template packs resource (VynFi API 4.1+, Team+).
+    pub fn template_packs(&self) -> TemplatePacks<'_> {
+        TemplatePacks::new(self)
     }
 
     // -- Internal request helpers (used by resource structs) ------------------
