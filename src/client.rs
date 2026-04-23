@@ -6,8 +6,8 @@ use serde_json::Value;
 
 use crate::error::{ErrorBody, VynFiError};
 use crate::resources::{
-    Adversarial, Ai, ApiKeys, Billing, Catalog, Configs, Credits, Fingerprint, Jobs,
-    Notifications, Optimizer, Quality, Scenarios, Sessions, TemplatePacks, Usage, Webhooks,
+    Adversarial, Ai, ApiKeys, Billing, Catalog, Configs, Credits, Fingerprint, Jobs, Notifications,
+    Optimizer, Quality, Scenarios, Sessions, TemplatePacks, Usage, Webhooks,
 };
 
 const DEFAULT_BASE_URL: &str = "https://api.vynfi.com";

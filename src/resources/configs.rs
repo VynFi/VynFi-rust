@@ -118,7 +118,10 @@ impl<'a> Configs<'a> {
     }
 
     /// Submit a raw DataSynth YAML config for validation (Scale+).
-    pub async fn submit_raw(&self, req: &RawConfigRequest) -> Result<RawConfigResponse, VynFiError> {
+    pub async fn submit_raw(
+        &self,
+        req: &RawConfigRequest,
+    ) -> Result<RawConfigResponse, VynFiError> {
         self.client
             .request_with_body(Method::POST, "/v1/configs/raw", Some(req))
             .await

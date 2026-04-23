@@ -206,7 +206,11 @@ impl<'a> Jobs<'a> {
         req: &AiTuneRequest,
     ) -> Result<AiTuneResponse, VynFiError> {
         self.client
-            .request_with_body(Method::POST, &format!("/v1/jobs/{}/tune", job_id), Some(req))
+            .request_with_body(
+                Method::POST,
+                &format!("/v1/jobs/{}/tune", job_id),
+                Some(req),
+            )
             .await
     }
 
@@ -269,10 +273,7 @@ impl<'a> Jobs<'a> {
                 }
             }
         }
-        Ok(job_ids
-            .iter()
-            .filter_map(|j| results.remove(j))
-            .collect())
+        Ok(job_ids.iter().filter_map(|j| results.remove(j)).collect())
     }
 
     /// Stream NDJSON output records from a job (DS 2.3+, Scale+).

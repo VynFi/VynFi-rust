@@ -28,19 +28,13 @@ impl<'a> Optimizer<'a> {
             .await
     }
 
-    pub async fn portfolio(
-        &self,
-        req: &PortfolioRequest,
-    ) -> Result<OptimizerResponse, VynFiError> {
+    pub async fn portfolio(&self, req: &PortfolioRequest) -> Result<OptimizerResponse, VynFiError> {
         self.client
             .request_with_body(Method::POST, "/v1/optimizer/portfolio", Some(req))
             .await
     }
 
-    pub async fn resources(
-        &self,
-        req: &ResourcesRequest,
-    ) -> Result<OptimizerResponse, VynFiError> {
+    pub async fn resources(&self, req: &ResourcesRequest) -> Result<OptimizerResponse, VynFiError> {
         self.client
             .request_with_body(Method::POST, "/v1/optimizer/resources", Some(req))
             .await

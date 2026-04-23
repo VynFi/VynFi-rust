@@ -72,8 +72,8 @@ impl JobArchive {
             });
         }
         if data.first().copied() == Some(b'{') {
-            let root: ManifestRoot = serde_json::from_slice(data)
-                .map_err(|e| format!("manifest parse: {e}"))?;
+            let root: ManifestRoot =
+                serde_json::from_slice(data).map_err(|e| format!("manifest parse: {e}"))?;
             let index = root
                 .files
                 .into_iter()

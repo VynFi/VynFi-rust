@@ -25,10 +25,7 @@ impl<'a> Adversarial<'a> {
 
     pub async fn results(&self, probe_id: &str) -> Result<AdversarialProbeResults, VynFiError> {
         self.client
-            .request(
-                Method::GET,
-                &format!("/v1/adversarial/{probe_id}/results"),
-            )
+            .request(Method::GET, &format!("/v1/adversarial/{probe_id}/results"))
             .await
     }
 }

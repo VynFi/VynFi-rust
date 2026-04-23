@@ -26,7 +26,7 @@ pub use client::{Client, ClientBuilder};
 pub use error::{ErrorBody, VynFiError};
 pub use resources::{
     Adversarial, Ai, ApiKeys, Billing, Catalog, Configs, Credits, Fingerprint, Jobs,
-    ListConfigsParams, ListJobsParams, ListNotificationsParams, NdjsonStreamParams,
-    Notifications, Optimizer, Quality, Scenarios, Sessions, TemplatePacks, Usage, Webhooks,
+    ListConfigsParams, ListJobsParams, ListNotificationsParams, NdjsonStreamParams, Notifications,
+    Optimizer, Quality, Scenarios, Sessions, TemplatePacks, Usage, Webhooks,
 };
 pub use types::*;

@@ -1303,11 +1303,9 @@ pub const SAP_DEFAULT_TABLES: &[&str] = &[
 /// Full SAP superset (DS 4.3+) — master data, transactional, open/cleared
 /// items for GL/AR/AP.
 pub const SAP_ALL_TABLES: &[&str] = &[
-    "bkpf", "bseg", "acdoca",
-    "lfa1", "lfb1", "kna1", "knb1", "mara", "mard", "anla", "csks", "cepc",
-    "ska1", "skb1",
-    "ekko", "ekpo", "vbak", "vbap", "likp", "lips", "mkpf", "mseg",
-    "bsis", "bsas", "bsid", "bsad", "bsik", "bsak",
+    "bkpf", "bseg", "acdoca", "lfa1", "lfb1", "kna1", "knb1", "mara", "mard", "anla", "csks",
+    "cepc", "ska1", "skb1", "ekko", "ekpo", "vbak", "vbap", "likp", "lips", "mkpf", "mseg", "bsis",
+    "bsas", "bsid", "bsad", "bsik", "bsak",
 ];
 
 #[derive(Debug, Clone, Serialize)]
@@ -1329,10 +1327,18 @@ pub struct SapExportConfig {
     pub include_extension_fields: bool,
 }
 
-fn default_sap_dialect() -> String { "hana".into() }
-fn default_sap_client() -> String { "200".into() }
-fn default_sap_ledger() -> String { "0L".into() }
-fn default_sap_source_system() -> String { "DATASYNTH".into() }
+fn default_sap_dialect() -> String {
+    "hana".into()
+}
+fn default_sap_client() -> String {
+    "200".into()
+}
+fn default_sap_ledger() -> String {
+    "0L".into()
+}
+fn default_sap_source_system() -> String {
+    "DATASYNTH".into()
+}
 
 impl Default for SapExportConfig {
     fn default() -> Self {
